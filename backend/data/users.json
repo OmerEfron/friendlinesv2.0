@@ -4,24 +4,26 @@
     "fullName": "John Doe",
     "email": "john@example.com",
     "createdAt": "2025-06-14T18:38:52.231Z",
-    "updatedAt": "2025-06-16T21:49:39.179Z",
+    "updatedAt": "2025-06-16T22:47:01.786Z",
     "followers": [
       "umbzk1mgxyqbyp"
     ],
     "following": [],
     "followersCount": 1,
-    "followingCount": 0
+    "followingCount": 0,
+    "expoPushToken": "ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]"
   },
   {
     "id": "umbwkza44j79m8",
     "fullName": "Jane Smith",
     "email": "jane@example.com",
     "createdAt": "2025-06-14T18:39:31.828Z",
-    "updatedAt": "2025-06-14T18:39:31.828Z",
+    "updatedAt": "2025-06-16T22:47:10.660Z",
     "followers": [],
     "following": [],
     "followersCount": 0,
-    "followingCount": 0
+    "followingCount": 0,
+    "expoPushToken": "ExponentPushToken[yyyyyyyyyyyyyyyyyyyy]"
   },
   {
     "id": "umbzjns2owqx20",
@@ -46,5 +48,16 @@
     ],
     "followersCount": 0,
     "followingCount": 1
+  },
+  {
+    "id": "umbzoq7ot6bckr",
+    "fullName": "Bob Wilson",
+    "email": "bob@example.com",
+    "createdAt": "2025-06-16T22:47:45.773Z",
+    "updatedAt": "2025-06-16T22:47:45.773Z",
+    "followers": [],
+    "following": [],
+    "followersCount": 0,
+    "followingCount": 0
   }
 ]

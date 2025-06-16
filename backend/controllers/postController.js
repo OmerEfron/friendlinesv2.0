@@ -4,6 +4,8 @@
 const { readJson, writeJson } = require("../utils/fileUtils");
 const { generateId, validatePaginationParams } = require("../utils/validation");
 const { generateNewsflash } = require("../utils/newsflashGenerator");
+const { sendPush, getFollowersTokens, getGroupMembersTokens } = require("../utils/notificationService");
+const { validateGroupAccess } = require("./groupController");
 
 /**
  * Get all posts (newsflashes) with pagination
@@ -50,6 +52,9 @@ const getAllPosts = async (req, res) => {
         timestamp: post.timestamp,
         createdAt: post.createdAt,
         updatedAt: post.updatedAt,
+        // Group features
+        groupIds: post.groupIds || [],
+        visibility: post.visibility || "public",
         // Social features
         likesCount: post.likesCount || 0,
         commentsCount: post.commentsCount || 0,
@@ -133,6 +138,9 @@ const getPostsByUser = async (req, res) => {
       timestamp: post.timestamp,
       createdAt: post.createdAt,
       updatedAt: post.updatedAt,
+      // Group features
+      groupIds: post.groupIds || [],
+      visibility: post.visibility || "public",
       // Social features
       likesCount: post.likesCount || 0,
       commentsCount: post.commentsCount || 0,
@@ -179,7 +187,7 @@ const getPostsByUser = async (req, res) => {
 const createPost = async (req, res) => {
   try {
     // Get validated data from middleware
-    const { rawText, userId } = req.validatedData;
+    const { rawText, userId, groupIds } = req.validatedData;
 
     // Read users and posts
     const users = await readJson("users.json");
@@ -194,6 +202,19 @@ const createPost = async (req, res) => {
         error: "No user found with the provided user ID",
         timestamp: new Date().toISOString(),
       });
+    }
+
+    // Validate group access if groupIds are provided
+    if (groupIds && groupIds.length > 0) {
+      const hasAccess = await validateGroupAccess(userId, groupIds);
+      if (!hasAccess) {
+        return res.status(403).json({
+          success: false,
+          message: "Access denied to one or more groups",
+          error: "You must be a member of all specified groups",
+          timestamp: new Date().toISOString(),
+        });
+      }
     }
 
     // Generate newsflash
@@ -219,6 +240,9 @@ const createPost = async (req, res) => {
       timestamp: new Date().toISOString(),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
+      // Group features
+      groupIds: groupIds || [],
+      visibility: groupIds && groupIds.length > 0 ? "groups_only" : "public",
       // Social features
       likes: [], // Array of user IDs who liked this post
       comments: [], // Array of comment objects
@@ -233,6 +257,61 @@ const createPost = async (req, res) => {
     // Save posts
     await writeJson("posts.json", posts);
 
+    // Send push notifications (non-blocking)
+    try {
+      let recipientTokens = [];
+      
+      if (groupIds && groupIds.length > 0) {
+        // Group post - notify group members
+        recipientTokens = await getGroupMembersTokens(groupIds, userId);
+        if (recipientTokens.length > 0) {
+          const notificationResult = await sendPush(
+            recipientTokens,
+            "New Group Newsflash!",
+            `${user.fullName}: ${generatedText.substring(0, 100)}${generatedText.length > 100 ? '...' : ''}`,
+            {
+              type: "group_post",
+              postId: newPost.id,
+              userId: userId,
+              userFullName: user.fullName,
+              groupIds: groupIds
+            }
+          );
+          
+          if (notificationResult.success) {
+            console.log(`Push notifications sent to ${recipientTokens.length} group members for post ${newPost.id}`);
+          } else {
+            console.error("Failed to send group push notifications:", notificationResult.error);
+          }
+        }
+      } else {
+        // Public post - notify followers
+        recipientTokens = await getFollowersTokens(userId);
+        if (recipientTokens.length > 0) {
+          const notificationResult = await sendPush(
+            recipientTokens,
+            "New Newsflash!",
+            `${user.fullName}: ${generatedText.substring(0, 100)}${generatedText.length > 100 ? '...' : ''}`,
+            {
+              type: "new_post",
+              postId: newPost.id,
+              userId: userId,
+              userFullName: user.fullName
+            }
+          );
+          
+          if (notificationResult.success) {
+            console.log(`Push notifications sent to ${recipientTokens.length} followers for post ${newPost.id}`);
+          } else {
+            console.error("Failed to send push notifications:", notificationResult.error);
+          }
+        }
+      }
+    } catch (notificationError) {
+      // Don't fail the post creation if notifications fail
+      console.error("Push notification error:", notificationError);
+    }
+
     // Return created post with user info
     const responsePost = {
       id: newPost.id,
@@ -243,6 +322,9 @@ const createPost = async (req, res) => {
       timestamp: newPost.timestamp,
       createdAt: newPost.createdAt,
       updatedAt: newPost.updatedAt,
+      // Group features
+      groupIds: newPost.groupIds,
+      visibility: newPost.visibility,
       // Social features
       likesCount: newPost.likesCount,
       commentsCount: newPost.commentsCount,

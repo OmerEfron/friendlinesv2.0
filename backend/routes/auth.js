@@ -15,6 +15,7 @@ const {
   getFollowers,
   getFollowing,
   getFollowStatus,
+  registerPushToken,
 } = require("../controllers/authController");
 
 // Import middleware
@@ -129,6 +130,19 @@ router.get(
   "/users/:id/follow-status",
   validateIdMiddleware("id"), // Validate user ID parameter
   getFollowStatus // Controller function
+);
+
+/**
+ * POST /users/:id/push-token
+ * Register push notification token for a user
+ * Body: { expoPushToken }
+ */
+router.post(
+  "/users/:id/push-token",
+  validateIdMiddleware("id"), // Validate user ID parameter
+  validateContentType, // Ensure JSON content type
+  ensureBodyExists, // Ensure request body exists
+  registerPushToken // Controller function
 );
 
 // Error handling middleware for auth routes

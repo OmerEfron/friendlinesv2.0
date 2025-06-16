@@ -18,6 +18,21 @@ const loginUser = async (fullName, email) => {
   }
   throw new Error(result.message);
 };
+
+// Register push notification token
+const registerPushToken = async (userId, expoPushToken) => {
+  const response = await fetch(`/api/users/${userId}/push-token`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ expoPushToken })
+  });
+  
+  const result = await response.json();
+  if (result.success) {
+    return result.data;
+  }
+  throw new Error(result.message);
+};
 ```
 
 ### Creating Posts

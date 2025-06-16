@@ -102,6 +102,16 @@ const initializeDataFiles = async () => {
       await writeJson("posts.json", []);
     }
 
+    // Initialize groups.json if it doesn't exist
+    try {
+      const groups = await readJson("groups.json");
+      if (!Array.isArray(groups)) {
+        await writeJson("groups.json", []);
+      }
+    } catch (error) {
+      await writeJson("groups.json", []);
+    }
+
     console.log("Data files initialized successfully");
   } catch (error) {
     console.error("Error initializing data files:", error);
@@ -109,8 +119,20 @@ const initializeDataFiles = async () => {
   }
 };
 
+/**
+ * Generate a unique ID with a prefix
+ * @param {string} prefix - The prefix for the ID (e.g., 'u' for users, 'p' for posts, 'g' for groups)
+ * @returns {string} - Generated ID
+ */
+const generateId = (prefix = '') => {
+  const timestamp = Date.now().toString();
+  const random = Math.random().toString(36).substr(2, 5);
+  return `${prefix}${timestamp}${random}`;
+};
+
 module.exports = {
   readJson,
   writeJson,
   initializeDataFiles,
+  generateId,
 };

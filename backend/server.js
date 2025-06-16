@@ -97,6 +97,7 @@ app.get("/health", (req, res) => {
 // API routes
 app.use("/api", require("./routes/auth")); // Auth routes (login, users)
 app.use("/api/posts", require("./routes/posts")); // Posts routes
+app.use("/api/groups", require("./routes/groups")); // Groups routes
 app.use("/api/reset", require("./routes/reset")); // Reset routes (development only)
 
 // Root endpoint
@@ -128,6 +129,14 @@ app.get("/", (req, res) => {
           getPost: "GET /api/posts/single/:id",
           postStats: "GET /api/posts/stats",
         },
+        groups: {
+          createGroup: "POST /api/groups/:userId",
+          inviteToGroup: "POST /api/groups/:id/invite",
+          acceptInvitation: "POST /api/groups/:id/accept",
+          leaveGroup: "POST /api/groups/:id/leave",
+          getGroup: "GET /api/groups/:id",
+          getUserGroups: "GET /api/groups/user/:userId",
+        },
         reset: {
           resetAll: "POST /api/reset",
           resetStatus: "GET /api/reset/status",
@@ -152,6 +161,8 @@ app.use("*", (req, res) => {
       "POST /api/login",
       "GET /api/posts",
       "POST /api/posts",
+      "POST /api/groups/:userId",
+      "GET /api/groups/:id",
       "POST /api/reset",
     ],
     timestamp: new Date().toISOString(),

@@ -1,0 +1,19 @@
+[
+  {
+    "id": "g1750113987799tqifb",
+    "name": "Ski Trip 2024",
+    "description": "Planning our winter getaway!",
+    "ownerId": "umbwkyfk7vfxpx",
+    "members": [
+      "umbwkyfk7vfxpx",
+      "umbwkza44j79m8"
+    ],
+    "invites": [],
+    "createdAt": "2025-06-16T22:46:27.799Z",
+    "updatedAt": "2025-06-16T22:46:45.328Z",
+    "settings": {
+      "postNotifications": true,
+      "membershipNotifications": true
+    }
+  }
+]

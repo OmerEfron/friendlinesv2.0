@@ -96,5 +96,23 @@
     "likesCount": 2,
     "commentsCount": 1,
     "sharesCount": 0
+  },
+  {
+    "id": "pmbzopo5g2uvs8",
+    "userId": "umbwkyfk7vfxpx",
+    "rawText": "Just booked our ski lodge! Winter is going to be amazing!",
+    "generatedText": "BREAKING: Just booked our ski lodge! winter was went to be amazing! - Sources confirm.",
+    "timestamp": "2025-06-16T22:47:20.452Z",
+    "createdAt": "2025-06-16T22:47:20.452Z",
+    "updatedAt": "2025-06-16T22:47:20.452Z",
+    "groupIds": [
+      "g1750113987799tqifb"
+    ],
+    "visibility": "groups_only",
+    "likes": [],
+    "comments": [],
+    "likesCount": 0,
+    "commentsCount": 0,
+    "sharesCount": 0
   }
 ]

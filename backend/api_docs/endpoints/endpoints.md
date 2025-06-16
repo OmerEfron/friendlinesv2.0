@@ -60,6 +60,17 @@ Root endpoint with API overview and available endpoints.
         "getComments": "GET /api/posts/:id/comments",
         "deleteComment": "DELETE /api/posts/:postId/comments/:commentId"
       },
+      "groups": {
+        "createGroup": "POST /api/groups/:userId",
+        "inviteToGroup": "POST /api/groups/:id/invite",
+        "acceptInvitation": "POST /api/groups/:id/accept",
+        "leaveGroup": "POST /api/groups/:id/leave",
+        "getGroup": "GET /api/groups/:id",
+        "getUserGroups": "GET /api/groups/user/:userId"
+      },
+      "notifications": {
+        "registerPushToken": "POST /api/users/:id/push-token"
+      },
       "reset": {
         "resetAll": "POST /api/reset",
         "resetStatus": "GET /api/reset/status",
@@ -71,5 +82,17 @@ Root endpoint with API overview and available endpoints.
   }
 }
 ```
+
+---
+
+## Detailed Documentation
+
+For detailed endpoint documentation, see the specific files:
+
+- **[Authentication Endpoints](./authentication_endpoints.md)** - User login, profile management, and social features
+- **[Posts Endpoints](./posts_endpoints.md)** - Post creation, management, likes, and comments  
+- **[Groups Endpoints](./groups_endpoints.md)** - Group management, invitations, and membership
+- **[Notification Endpoints](./notification_endpoints.md)** - Push notification registration and automatic delivery
+- **[Development Endpoints](./development_endpoints.md)** - Development and testing utilities
 
 ---

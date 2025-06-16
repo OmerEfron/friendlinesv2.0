@@ -5,6 +5,9 @@ const {
   validateUserData,
   validatePostData,
   validatePostUpdate,
+  validateGroupData,
+  validateInviteData,
+  validateUserActionData,
   isValidId,
 } = require("../utils/validation");
 
@@ -151,10 +154,79 @@ const validateContentType = (req, res, next) => {
   next();
 };
 
+/**
+ * Middleware to validate group creation data
+ */
+const validateGroupMiddleware = (req, res, next) => {
+  const validation = validateGroupData(req.body);
+
+  if (!validation.isValid) {
+    return res.status(400).json({
+      success: false,
+      message: "Validation failed",
+      errors: validation.errors,
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  // Attach sanitized data to request
+  req.validatedData = validation.sanitizedData;
+  next();
+};
+
+/**
+ * Middleware to validate group invitation data
+ */
+const validateInviteMiddleware = (req, res, next) => {
+  // Combine body data with any userId from params or body
+  const inviteData = {
+    ...req.body,
+    userId: req.body.userId || req.params.userId
+  };
+
+  const validation = validateInviteData(inviteData);
+
+  if (!validation.isValid) {
+    return res.status(400).json({
+      success: false,
+      message: "Validation failed",
+      errors: validation.errors,
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  // Attach sanitized data to request
+  req.validatedData = validation.sanitizedData;
+  next();
+};
+
+/**
+ * Middleware to validate user action data
+ */
+const validateUserActionMiddleware = (req, res, next) => {
+  const validation = validateUserActionData(req.body);
+
+  if (!validation.isValid) {
+    return res.status(400).json({
+      success: false,
+      message: "Validation failed",
+      errors: validation.errors,
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  // Attach sanitized data to request
+  req.validatedData = validation.sanitizedData;
+  next();
+};
+
 module.exports = {
   validateUserMiddleware,
   validatePostMiddleware,
   validatePostUpdateMiddleware,
+  validateGroupMiddleware,
+  validateInviteMiddleware,
+  validateUserActionMiddleware,
   validateIdMiddleware,
   validateUserIdMiddleware,
   validatePostIdMiddleware,

@@ -95,3 +95,13 @@ Check if a user exists by email.
 ```
 
 ---
+
+### Social Features
+
+For social features (follow/unfollow, followers, following), see the detailed social features documentation.
+
+### Push Notifications
+
+For push notification token registration, see the [Notification Endpoints](./notification_endpoints.md) documentation.
+
+---

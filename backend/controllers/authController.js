@@ -3,6 +3,7 @@
 
 const { readJson, writeJson } = require("../utils/fileUtils");
 const { generateId } = require("../utils/validation");
+const { registerDevice } = require("../utils/notificationService");
 
 /**
  * Handle user login (create or retrieve user)
@@ -683,6 +684,64 @@ const getFollowStatus = async (req, res) => {
   }
 };
 
+/**
+ * Register push notification token for a user
+ * POST /users/:id/push-token
+ */
+const registerPushToken = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { expoPushToken } = req.body;
+
+    // Validate expoPushToken
+    if (!expoPushToken || typeof expoPushToken !== "string" || expoPushToken.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Push token is required",
+        error: "Valid Expo push token must be provided",
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    // Use notification service to register device
+    const result = await registerDevice(id, expoPushToken.trim());
+
+    if (!result.success) {
+      const statusCode = result.error === 'User not found' ? 404 : 
+                        result.error === 'Invalid Expo push token format' ? 400 : 500;
+      
+      return res.status(statusCode).json({
+        success: false,
+        message: "Failed to register push token",
+        error: result.error,
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Push token registered successfully",
+      data: {
+        userId: id,
+        tokenRegistered: true,
+        updatedAt: new Date().toISOString(),
+      },
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error("Register push token error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error registering push token",
+      error:
+        process.env.NODE_ENV === "development"
+          ? error.message
+          : "Something went wrong",
+      timestamp: new Date().toISOString(),
+    });
+  }
+};
+
 module.exports = {
   login,
   getUserProfile,
@@ -693,4 +752,5 @@ module.exports = {
   getFollowers,
   getFollowing,
   getFollowStatus,
+  registerPushToken,
 };

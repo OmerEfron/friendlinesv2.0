@@ -68,6 +68,11 @@ curl http://localhost:3000/api/users/USER_ID_HERE/followers
 
 # Get following
 curl http://localhost:3000/api/users/USER_ID_HERE/following
+
+# Register push token
+curl -X POST http://localhost:3000/api/users/USER_ID_HERE/push-token \
+  -H "Content-Type: application/json" \
+  -d '{"expoPushToken": "ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]"}'
 ```
 
 #### Development Tools

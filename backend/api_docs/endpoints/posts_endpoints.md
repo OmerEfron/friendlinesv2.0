@@ -104,13 +104,15 @@ Create a new post with automatic newsflash generation.
 ```json
 {
   "rawText": "I just got a new dog! 🐶",
-  "userId": "u123456789"
+  "userId": "u123456789",
+  "groupIds": ["g123456789", "g987654321"]
 }
 ```
 
 **Validation Rules:**
 - `rawText`: Required, 1-280 characters, no HTML/script tags
 - `userId`: Required, valid user ID format
+- `groupIds`: Optional array, max 5 group IDs, no duplicates
 
 **Response (201):**
 ```json
@@ -134,8 +136,14 @@ Create a new post with automatic newsflash generation.
 }
 ```
 
+**Additional Group Features:**
+- If `groupIds` are provided, post visibility is set to "groups_only"
+- Group posts notify group members instead of followers
+- User must be a member of all specified groups
+
 **Error Responses:**
 - `400`: Validation failed or newsflash generation failed
+- `403`: Access denied to one or more groups (user not a member)
 - `404`: User not found
 - `429`: Too many posts created (rate limited)
 - `500`: Server error

@@ -21,6 +21,7 @@ All API responses now include social features:
   "id": "u123456789",
   "fullName": "John Doe",
   "email": "john@example.com",
+  "expoPushToken": "ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]",
   "createdAt": "2025-06-14T18:00:00.000Z",
   "updatedAt": "2025-06-14T18:00:00.000Z",
   "followers": ["u987654321"],
@@ -61,6 +62,7 @@ All API responses now include social features:
 - Posts contain `comments: []` array of comment objects
 - Users contain `followers: []` array of user IDs who follow this user  
 - Users contain `following: []` array of user IDs this user follows
+- Users contain `expoPushToken` for push notifications (optional field)
 - All counts are denormalized for optimal performance
 - JSON files are used for POC simplicity (`data/users.json`, `data/posts.json`)
 

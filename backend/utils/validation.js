@@ -134,7 +134,7 @@ const validatePostData = (postData) => {
     return { isValid: false, errors };
   }
 
-  const { rawText, userId } = postData;
+  const { rawText, userId, groupIds } = postData;
 
   // Validate user ID
   if (!userId || typeof userId !== "string" || userId.trim().length === 0) {
@@ -147,12 +147,36 @@ const validatePostData = (postData) => {
     errors.push(...textValidation.errors);
   }
 
+  // Validate group IDs (optional)
+  if (groupIds !== undefined) {
+    if (!Array.isArray(groupIds)) {
+      errors.push("Group IDs must be an array");
+    } else if (groupIds.length > 5) {
+      errors.push("Cannot post to more than 5 groups at once");
+    } else {
+      // Validate each group ID
+      for (let i = 0; i < groupIds.length; i++) {
+        const groupId = groupIds[i];
+        if (!groupId || typeof groupId !== "string" || groupId.trim().length === 0) {
+          errors.push(`Invalid group ID at position ${i + 1}`);
+        }
+      }
+
+      // Check for duplicates
+      const uniqueIds = [...new Set(groupIds)];
+      if (uniqueIds.length !== groupIds.length) {
+        errors.push("Duplicate group IDs are not allowed");
+      }
+    }
+  }
+
   return {
     isValid: errors.length === 0,
     errors,
     sanitizedData: {
       rawText: rawText ? rawText.trim() : "",
       userId: userId ? userId.trim() : "",
+      groupIds: groupIds ? groupIds.map(id => id.trim()).filter(Boolean) : [],
     },
   };
 };
@@ -185,6 +209,136 @@ const validatePostUpdate = (updateData) => {
     errors,
     sanitizedData: {
       rawText: rawText ? rawText.trim() : undefined,
+    },
+  };
+};
+
+/**
+ * Validate group creation data
+ * @param {Object} groupData - Group data to validate
+ * @returns {Object} - Validation result with isValid and errors
+ */
+const validateGroupData = (groupData) => {
+  const errors = [];
+
+  if (!groupData || typeof groupData !== "object") {
+    errors.push("Group data is required and must be an object");
+    return { isValid: false, errors };
+  }
+
+  const { name, description } = groupData;
+
+  // Validate group name
+  if (!name || typeof name !== "string") {
+    errors.push("Group name is required and must be a string");
+  } else {
+    const trimmedName = name.trim();
+    if (trimmedName.length < 3) {
+      errors.push("Group name must be at least 3 characters long");
+    } else if (trimmedName.length > 50) {
+      errors.push("Group name cannot exceed 50 characters");
+    }
+  }
+
+  // Validate description (optional)
+  if (description !== undefined && description !== null) {
+    if (typeof description !== "string") {
+      errors.push("Group description must be a string");
+    } else if (description.trim().length > 200) {
+      errors.push("Group description cannot exceed 200 characters");
+    }
+  }
+
+  return {
+    isValid: errors.length === 0,
+    errors,
+    sanitizedData: {
+      name: name ? name.trim() : "",
+      description: description ? description.trim() : "",
+    },
+  };
+};
+
+/**
+ * Validate group invitation data
+ * @param {Object} inviteData - Invitation data to validate
+ * @returns {Object} - Validation result with isValid and errors
+ */
+const validateInviteData = (inviteData) => {
+  const errors = [];
+
+  if (!inviteData || typeof inviteData !== "object") {
+    errors.push("Invite data is required and must be an object");
+    return { isValid: false, errors };
+  }
+
+  const { userIds, userId } = inviteData;
+
+  // Validate userId (current user)
+  if (!userId || typeof userId !== "string" || userId.trim().length === 0) {
+    errors.push("User ID is required");
+  }
+
+  // Validate userIds array
+  if (!userIds || !Array.isArray(userIds)) {
+    errors.push("User IDs must be provided as an array");
+  } else {
+    if (userIds.length === 0) {
+      errors.push("At least one user ID must be provided");
+    } else if (userIds.length > 10) {
+      errors.push("Cannot invite more than 10 users at once");
+    }
+
+    // Validate each user ID
+    for (let i = 0; i < userIds.length; i++) {
+      const id = userIds[i];
+      if (!id || typeof id !== "string" || id.trim().length === 0) {
+        errors.push(`Invalid user ID at position ${i + 1}`);
+      }
+    }
+
+    // Check for duplicates
+    const uniqueIds = [...new Set(userIds)];
+    if (uniqueIds.length !== userIds.length) {
+      errors.push("Duplicate user IDs are not allowed");
+    }
+  }
+
+  return {
+    isValid: errors.length === 0,
+    errors,
+    sanitizedData: {
+      userIds: userIds ? userIds.map(id => id.trim()) : [],
+      userId: userId ? userId.trim() : "",
+    },
+  };
+};
+
+/**
+ * Validate user action data (for accept/leave/etc.)
+ * @param {Object} actionData - Action data to validate
+ * @returns {Object} - Validation result with isValid and errors
+ */
+const validateUserActionData = (actionData) => {
+  const errors = [];
+
+  if (!actionData || typeof actionData !== "object") {
+    errors.push("Action data is required and must be an object");
+    return { isValid: false, errors };
+  }
+
+  const { userId } = actionData;
+
+  // Validate userId
+  if (!userId || typeof userId !== "string" || userId.trim().length === 0) {
+    errors.push("User ID is required");
+  }
+
+  return {
+    isValid: errors.length === 0,
+    errors,
+    sanitizedData: {
+      userId: userId ? userId.trim() : "",
     },
   };
 };
@@ -265,6 +419,9 @@ module.exports = {
   validateUserData,
   validatePostData,
   validatePostUpdate,
+  validateGroupData,
+  validateInviteData,
+  validateUserActionData,
   sanitizeText,
   isValidId,
   generateId,
