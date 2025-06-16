@@ -1,0 +1,36 @@
+🔧 Initializing Friendlines Backend...
+Successfully wrote users.json
+Successfully wrote posts.json
+Data files initialized successfully
+✅ Data files initialized
+🚀 Friendlines Backend Server Started!
+📡 Server running on port 3000
+🌍 Environment: development
+🔗 Health check: http://localhost:3000/health
+📚 API Documentation: http://localhost:3000/
+📝 Ready to transform everyday updates into newsflashes!
+🛠️  Development mode - Reset endpoint available at POST /api/reset
+[2025-06-14T18:12:56.025Z] GET /health 
+[2025-06-14T18:38:40.872Z] GET / 
+[2025-06-14T18:38:52.226Z] POST /api/login { fullName: 'John Doe', email: 'john@example.com' }
+Successfully wrote users.json
+New user created: john@example.com
+[2025-06-14T18:39:02.324Z] POST /api/posts { rawText: 'I just got a new dog! 🐶', userId: 'umbwkyfk7vfxpx' }
+Successfully wrote posts.json
+New post created by John Doe: pmbwkynclz49yj
+[2025-06-14T18:39:12.655Z] GET /api/posts 
+[2025-06-14T18:39:21.569Z] GET /api/reset/status 
+[2025-06-14T18:39:31.827Z] POST /api/login { fullName: 'Jane Smith', email: 'jane@example.com' }
+Successfully wrote users.json
+New user created: jane@example.com
+[2025-06-14T18:39:40.636Z] POST /api/posts {
+  rawText: 'I am working on a secret project 🚀',
+  userId: 'umbwkza44j79m8'
+}
+Successfully wrote posts.json
+New post created by Jane Smith: pmbwkzgwtzi72p
+[2025-06-14T18:39:51.016Z] GET /api/posts 
+[2025-06-14T18:40:01.360Z] PUT /api/posts/pmbwkynclz49yj { rawText: 'I just adopted two puppies! 🐶🐶' }
+Successfully wrote posts.json
+Post updated by John Doe: pmbwkynclz49yj
+📦 SIGTERM received, shutting down gracefully...

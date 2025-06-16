@@ -1,0 +1,100 @@
+[
+  {
+    "id": "pmbwkynclz49yj",
+    "userId": "umbwkyfk7vfxpx",
+    "rawText": "I just adopted two puppies! 🐶🐶",
+    "generatedText": "URGENT: John Doe just adopted two puppies! 🐶🐶.",
+    "timestamp": "2025-06-14T18:39:02.325Z",
+    "createdAt": "2025-06-14T18:39:02.325Z",
+    "updatedAt": "2025-06-14T18:40:01.361Z",
+    "likes": [],
+    "comments": [],
+    "likesCount": 0,
+    "commentsCount": 0,
+    "sharesCount": 0
+  },
+  {
+    "id": "pmbwkzgwtzi72p",
+    "userId": "umbwkza44j79m8",
+    "rawText": "I am working on a secret project 🚀",
+    "generatedText": "EXCLUSIVE: Jane Smith was worked on a secret project 🚀.",
+    "timestamp": "2025-06-14T18:39:40.637Z",
+    "createdAt": "2025-06-14T18:39:40.637Z",
+    "updatedAt": "2025-06-14T18:39:40.637Z",
+    "likes": [],
+    "comments": [],
+    "likesCount": 0,
+    "commentsCount": 0,
+    "sharesCount": 0
+  },
+  {
+    "id": "pmbzk50i0e0zhi",
+    "userId": "umbzk1mgxyqbyp",
+    "rawText": "BREAKING: Test",
+    "generatedText": "BREAKING: Breaking: test.",
+    "timestamp": "2025-06-16T20:39:18.216Z",
+    "createdAt": "2025-06-16T20:39:18.216Z",
+    "updatedAt": "2025-06-16T21:54:42.724Z",
+    "likes": [],
+    "comments": [],
+    "likesCount": 0,
+    "commentsCount": 0,
+    "sharesCount": 0
+  },
+  {
+    "id": "pmbzkkoxhdarp9",
+    "userId": "umbwkyfk7vfxpx",
+    "rawText": "I just got a new dog! 🐶",
+    "generatedText": "URGENT: John Doe just got a new dog! 🐶. - Sources confirm.",
+    "timestamp": "2025-06-16T20:51:29.717Z",
+    "createdAt": "2025-06-16T20:51:29.717Z",
+    "updatedAt": "2025-06-16T20:58:27.446Z",
+    "likes": [
+      "umbzk1mgxyqbyp",
+      "umbwkyfk7vfxpx"
+    ],
+    "comments": [],
+    "likesCount": 2,
+    "commentsCount": 0,
+    "sharesCount": 0
+  },
+  {
+    "id": "pmbzku35nw6mym",
+    "userId": "umbwkyfk7vfxpx",
+    "rawText": "Testing the likes system! 👍",
+    "generatedText": "BREAKING: Testing the likes system! 👍. - Live coverage continues.",
+    "timestamp": "2025-06-16T20:58:48.059Z",
+    "createdAt": "2025-06-16T20:58:48.059Z",
+    "updatedAt": "2025-06-16T20:58:48.059Z",
+    "likes": [],
+    "comments": [],
+    "likesCount": 0,
+    "commentsCount": 0,
+    "sharesCount": 0
+  },
+  {
+    "id": "pmbzl0b15jdgto",
+    "userId": "umbwkyfk7vfxpx",
+    "rawText": "Testing frontend likes integration! 🧪",
+    "generatedText": "BREAKING: Testing frontend likes integration! 🧪. - More details to follow.",
+    "timestamp": "2025-06-16T21:03:38.201Z",
+    "createdAt": "2025-06-16T21:03:38.201Z",
+    "updatedAt": "2025-06-16T21:15:27.487Z",
+    "likes": [
+      "umbwkyfk7vfxpx",
+      "umbzk1mgxyqbyp"
+    ],
+    "comments": [
+      {
+        "id": "mbzlfibjxr44h",
+        "userId": "umbzk1mgxyqbyp",
+        "text": "Test",
+        "timestamp": "2025-06-16T21:15:27.487Z",
+        "createdAt": "2025-06-16T21:15:27.487Z"
+      }
+    ],
+    "likesCount": 2,
+    "commentsCount": 1,
+    "sharesCount": 0
+  }
+]

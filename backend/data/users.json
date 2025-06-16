@@ -1,0 +1,50 @@
+[
+  {
+    "id": "umbwkyfk7vfxpx",
+    "fullName": "John Doe",
+    "email": "john@example.com",
+    "createdAt": "2025-06-14T18:38:52.231Z",
+    "updatedAt": "2025-06-16T21:49:39.179Z",
+    "followers": [
+      "umbzk1mgxyqbyp"
+    ],
+    "following": [],
+    "followersCount": 1,
+    "followingCount": 0
+  },
+  {
+    "id": "umbwkza44j79m8",
+    "fullName": "Jane Smith",
+    "email": "jane@example.com",
+    "createdAt": "2025-06-14T18:39:31.828Z",
+    "updatedAt": "2025-06-14T18:39:31.828Z",
+    "followers": [],
+    "following": [],
+    "followersCount": 0,
+    "followingCount": 0
+  },
+  {
+    "id": "umbzjns2owqx20",
+    "fullName": "Test User",
+    "email": "testuser@example.com",
+    "createdAt": "2025-06-16T20:25:54.144Z",
+    "updatedAt": "2025-06-16T20:25:54.144Z",
+    "followers": [],
+    "following": [],
+    "followersCount": 0,
+    "followingCount": 0
+  },
+  {
+    "id": "umbzk1mgxyqbyp",
+    "fullName": "Omer Efron",
+    "email": "omer@gmail.com",
+    "createdAt": "2025-06-16T20:36:40.065Z",
+    "updatedAt": "2025-06-16T21:49:39.179Z",
+    "followers": [],
+    "following": [
+      "umbwkyfk7vfxpx"
+    ],
+    "followersCount": 0,
+    "followingCount": 1
+  }
+]
