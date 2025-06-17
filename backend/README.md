@@ -2,23 +2,112 @@
 
 A satirical social news API that transforms everyday life updates into dramatic newsflashes. Built with Node.js and Express for the Friendlines POC.
 
+## Features
+
+- User authentication and management
+- Newsflash post creation with automatic generation
+- Group management and group-specific posts
+- Social features (likes, comments)
+- Push notifications via Expo
+- Rate limiting and validation
+- Comprehensive test coverage
+
 ## 🚀 Quick Start
 
+1. Install dependencies:
 ```bash
-# Install dependencies
 npm install
-
-# Start the server
-npm start
-
-# Run in development mode with auto-restart
-npm run dev
-
-# Run tests
-npm test
 ```
 
-The server will start on `http://localhost:3000` by default.
+2. Set up environment variables (create `.env` file):
+```bash
+# Required
+PORT=3000
+NODE_ENV=development
+
+# Optional - for GPT newsflash generation
+OPENAI_API_KEY=sk-your-openai-api-key-here
+OPENAI_CHAT_MODEL=gpt-3.5-turbo
+```
+
+3. Start the server:
+```bash
+npm run dev
+```
+
+## GPT Newsflash Generation
+
+The backend now supports enhanced newsflash generation using OpenAI's ChatGPT API alongside the original deterministic generator.
+
+### Setup
+
+1. Get an OpenAI API key from [OpenAI Platform](https://platform.openai.com/api-keys)
+2. Add it to your environment variables:
+```bash
+OPENAI_API_KEY=sk-your-api-key-here
+OPENAI_CHAT_MODEL=gpt-3.5-turbo  # optional, defaults to gpt-3.5-turbo
+```
+
+### Features
+
+- **Environment-Based Selection**: Development mode uses deterministic generation for consistency
+- **Production GPT**: Production mode uses OpenAI GPT when API key is available
+- **Automatic Fallback**: If GPT generation fails or no API key is provided, falls back to deterministic generation
+- **Configurable Tone**: Choose from satirical, serious, humorous, sarcastic, excited
+- **Length Control**: Short (1 sentence) or long (2-3 sentences)
+- **Temperature Control**: Adjust creativity level (0-2)
+- **Preview Endpoint**: Test newsflash generation without creating a post
+
+### Usage
+
+#### Creating Posts with GPT Options
+
+```bash
+POST /api/posts
+{
+  "rawText": "Just got a new puppy!",
+  "userId": "u123456789",
+  "tone": "excited",
+  "length": "short",
+  "temperature": 0.8
+}
+```
+
+#### Preview Newsflash Generation
+
+```bash
+POST /api/posts/generate-newsflash
+{
+  "rawText": "Just got a new puppy!",
+  "userId": "u123456789",
+  "tone": "humorous",
+  "length": "long",
+  "temperature": 1.0
+}
+```
+
+Response:
+```json
+{
+  "success": true,
+  "data": {
+    "rawText": "Just got a new puppy!",
+    "generatedText": "BREAKING: Local resident welcomes adorable four-legged chaos into their previously peaceful home! Sources report the new puppy has already claimed the best spot on the couch.",
+    "method": "gpt",
+    "user": { "id": "u123456789", "fullName": "John Doe" },
+    "options": { "tone": "humorous", "length": "long", "temperature": 1.0 }
+  }
+}
+```
+
+### Implementation Details
+
+- Uses Node.js built-in `fetch` (Node 20+)
+- Environment-aware generation: deterministic in development, GPT in production
+- Graceful error handling with fallback
+- Input validation and sanitization
+- Comprehensive test coverage
+- Rate limiting protection
 
 ## 📡 API Endpoints
 
@@ -144,6 +233,18 @@ The newsflash generator transforms first-person updates into third-person news-s
 - **Input**: "I just got a new job!"
 - **Output**: "BREAKING: John Doe just got a new job!"
 
+### Environment-Based Generation:
+
+**Development Mode** (`NODE_ENV=development`):
+- Always uses deterministic rule-based generation
+- Ensures consistent behavior during testing and development
+- No API calls made, even if `OPENAI_API_KEY` is present
+
+**Production Mode** (`NODE_ENV=production`):
+- Uses OpenAI GPT if `OPENAI_API_KEY` is available
+- Falls back to deterministic generation if GPT fails or no API key
+- Supports configurable tone, length, and temperature
+
 ### Features:
 
 - ✅ Converts first-person pronouns to third-person
@@ -207,7 +308,9 @@ Uses JSON files for POC simplicity:
 ### Environment Variables:
 
 - `PORT` - Server port (default: 3000)
-- `NODE_ENV` - Environment mode (development/production)
+- `NODE_ENV` - Environment mode (development = deterministic newsflash, production = GPT if available)
+- `OPENAI_API_KEY` - OpenAI API key for GPT newsflash generation (production only)
+- `OPENAI_CHAT_MODEL` - OpenAI model to use (default: gpt-3.5-turbo)
 
 ### Rate Limits:
 

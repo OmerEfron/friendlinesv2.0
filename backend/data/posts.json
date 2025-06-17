@@ -134,5 +134,93 @@
     "likesCount": 1,
     "commentsCount": 0,
     "sharesCount": 0
+  },
+  {
+    "id": "pmbzuezv5cz8wj",
+    "userId": "umbzk1mgxyqbyp",
+    "rawText": "Test post group",
+    "generatedText": "BREAKING: Test post group.",
+    "timestamp": "2025-06-17T01:27:00.113Z",
+    "createdAt": "2025-06-17T01:27:00.113Z",
+    "updatedAt": "2025-06-17T01:27:00.113Z",
+    "groupIds": [
+      "g1750123575321slfd2"
+    ],
+    "visibility": "groups_only",
+    "likes": [],
+    "comments": [],
+    "likesCount": 0,
+    "commentsCount": 0,
+    "sharesCount": 0
+  },
+  {
+    "id": "pmbzuozqbtbquz",
+    "userId": "umbzk1mgxyqbyp",
+    "rawText": "Group post test",
+    "generatedText": "BREAKING: Group post test.",
+    "timestamp": "2025-06-17T01:34:46.499Z",
+    "createdAt": "2025-06-17T01:34:46.499Z",
+    "updatedAt": "2025-06-17T01:34:46.499Z",
+    "groupIds": [
+      "g1750123575321slfd2"
+    ],
+    "visibility": "groups_only",
+    "likes": [],
+    "comments": [],
+    "likesCount": 0,
+    "commentsCount": 0,
+    "sharesCount": 0
+  },
+  {
+    "id": "pmbzupmpwfqtee",
+    "userId": "umbzk1mgxyqbyp",
+    "rawText": "Group test post",
+    "generatedText": "BREAKING: Group test post.",
+    "timestamp": "2025-06-17T01:35:16.292Z",
+    "createdAt": "2025-06-17T01:35:16.292Z",
+    "updatedAt": "2025-06-17T01:35:16.292Z",
+    "groupIds": [
+      "g1750123575321slfd2"
+    ],
+    "visibility": "groups_only",
+    "likes": [],
+    "comments": [],
+    "likesCount": 0,
+    "commentsCount": 0,
+    "sharesCount": 0
+  },
+  {
+    "id": "pmbzutlysfctqh",
+    "userId": "umbzk1mgxyqbyp",
+    "rawText": "Hgruj",
+    "generatedText": "BREAKING: Hgruj.",
+    "timestamp": "2025-06-17T01:38:21.940Z",
+    "createdAt": "2025-06-17T01:38:21.940Z",
+    "updatedAt": "2025-06-17T01:38:21.940Z",
+    "groupIds": [
+      "g1750123575321slfd2"
+    ],
+    "visibility": "groups_only",
+    "likes": [],
+    "comments": [],
+    "likesCount": 0,
+    "commentsCount": 0,
+    "sharesCount": 0
+  },
+  {
+    "id": "pmbzwciygwmjld",
+    "userId": "umbzk1mgxyqbyp",
+    "rawText": "I just got 5 out of 100 in my exam at university",
+    "generatedText": "URGENT: Omer gmail just got 5 out of 100 in omer's exwas at university.",
+    "timestamp": "2025-06-17T02:21:04.120Z",
+    "createdAt": "2025-06-17T02:21:04.120Z",
+    "updatedAt": "2025-06-17T02:21:04.120Z",
+    "groupIds": [],
+    "visibility": "public",
+    "likes": [],
+    "comments": [],
+    "likesCount": 0,
+    "commentsCount": 0,
+    "sharesCount": 0
   }
 ]

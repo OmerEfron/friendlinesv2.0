@@ -1,0 +1,63 @@
+---
+description: 
+globs: backend/**
+alwaysApply: false
+---
+# Friendlines – Backend Rule
+---
+ruleType: autoAttached
+version: 1.0.0
+created: 2025-06-17
+authors:
+  - name: Friendlines Core Team
+    contact: core@friendlines.app
+---
+
+## 1  Project Scope
+Applies to **all files under `/backend`** including controllers, routes, middleware, utils, tests and docs.
+
+## 2  Runtime & Language
+• **Node.js 20** (ES 2022).<br/>• Prefer ESM `import`/`export` when possible, else CommonJS with `require`.<br/>• Use `async/await`, top-level `await` allowed in Node-20 contexts.
+
+## 3  Folder Conventions
+| Path | Purpose |
+| ---- | ------- |
+| `controllers/` | Business logic, 1-to-1 with route modules |
+| `routes/` | Express routers registering endpoints |
+| `middleware/` | Validation, rate-limiting, auth |
+| `utils/` | Pure helpers (stateless) |
+| `data/` | JSON persistence layer (treated as in-memory DB) |
+
+## 4  Data Access
+1. **NEVER** call `fs.readFileSync` / `fs.writeFileSync`.<br/>2. Use `readJson` / `writeJson` in `utils/fileUtils.js` for **all** reads & writes.<br/>3. Keep writes atomic – read → mutate → write.<br/>4. Denormalised counts **must** be updated with every mutation.
+
+## 5  Controllers
+```js
+// Skeleton pattern
+router.post(
+  '/posts',
+  rateLimiter.postLimiter,
+  validatePostMiddleware,
+  postController.createPost,
+);
+```
+• Wrap logic in `try/catch` and `next(err)`.<br/>• Send responses that match `/backend/api_docs/general/response_format.md`.<br/>• NO business logic inside route files.
+
+## 6  Validation & Security
+• Extend functions in `middleware/validation.js`; **do not** introduce external schema libs.<br/>• Sanitize all user input via `utils/validation.js` helpers.<br/>• Follow ID format rules (`u`, `p`, `g` prefixes).<br/>• Respect rate-limits defined in `middleware/rateLimiter.js`.
+
+## 7  Testing (Jest + Supertest)
+• Aim ≥ 90 % coverage for new code.<br/>• Mock filesystem: `jest.mock('../utils/fileUtils.js')`.<br/>• Integration tests spin up an **in-process** Express app (no network ports).
+
+## 8  Documentation
+Whenever an endpoint or behaviour changes, update **matching markdown** in `/backend/api_docs/**` before marking a task complete.
+
+## 9  Error Codes
+Follow `/backend/api_docs/architecture/http_status_codes.md` exactly.
+
+## 10  Deprecated Patterns (❌ DO NOT USE)
+* `var`, callbacks, `then()` chains.
+* Synchronous FS in controllers.
+* Inline validation logic in controllers.
+* Global variables for state (aside from in-memory JSON arrays loaded via utils).
+

@@ -15,5 +15,21 @@
       "postNotifications": true,
       "membershipNotifications": true
     }
+  },
+  {
+    "id": "g1750123575321slfd2",
+    "name": "Test group",
+    "description": "Test",
+    "ownerId": "umbzk1mgxyqbyp",
+    "members": [
+      "umbzk1mgxyqbyp"
+    ],
+    "invites": [],
+    "createdAt": "2025-06-17T01:26:15.321Z",
+    "updatedAt": "2025-06-17T01:26:15.321Z",
+    "settings": {
+      "postNotifications": true,
+      "membershipNotifications": true
+    }
   }
 ]

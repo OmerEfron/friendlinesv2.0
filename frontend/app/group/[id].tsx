@@ -6,13 +6,35 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
+  RefreshControl,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { useRouter, useLocalSearchParams } from "expo-router";
-import { ArrowLeft, Users, UserPlus, Settings } from "lucide-react-native";
+import { ArrowLeft, Users, UserPlus, Settings, MessageCircle } from "lucide-react-native";
 import { groupService, GroupWithMembers } from "../../services/api";
 import { useAuth } from "../../context/AuthContext";
 import { useGroups } from "../../context/GroupsContext";
+import PostCard from "../../components/PostCard";
+import CommentsModal from "../../components/CommentsModal";
+import EditPostModal from "../../components/EditPostModal";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import api from "../../services/api";
+
+interface GroupPost {
+  id: string;
+  userId: string;
+  userFullName: string;
+  rawText: string;
+  generatedText: string;
+  timestamp: string;
+  createdAt: string;
+  updatedAt: string;
+  likesCount: number;
+  commentsCount: number;
+  sharesCount: number;
+  groupIds: string[];
+  visibility: string;
+}
 
 export default function GroupDetailScreen() {
   const router = useRouter();
@@ -21,6 +43,15 @@ export default function GroupDetailScreen() {
   const { userGroups, leaveGroup } = useGroups();
   const [group, setGroup] = useState<GroupWithMembers | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [posts, setPosts] = useState<GroupPost[]>([]);
+  const [isLoadingPosts, setIsLoadingPosts] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [likedPosts, setLikedPosts] = useState<Set<string>>(new Set());
+  const [commentsModalVisible, setCommentsModalVisible] = useState(false);
+  const [selectedPost, setSelectedPost] = useState<GroupPost | null>(null);
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [postToEdit, setPostToEdit] = useState<GroupPost | null>(null);
+  const [activeTab, setActiveTab] = useState<'info' | 'posts'>('info');
 
   const isOwner = group?.ownerId === user?.id;
   const isMember = userGroups?.owned.some(g => g.id === id) || 
@@ -45,6 +76,197 @@ export default function GroupDetailScreen() {
 
     fetchGroup();
   }, [id, user]);
+
+  // Load liked posts from storage
+  const loadLikedPosts = async (): Promise<Set<string>> => {
+    try {
+      if (!user) return new Set<string>();
+      const stored = await AsyncStorage.getItem(`likedPosts_${user.id}`);
+      if (stored) {
+        const parsedArray: string[] = JSON.parse(stored);
+        return new Set(parsedArray);
+      }
+      return new Set<string>();
+    } catch (error) {
+      console.error("Failed to load liked posts:", error);
+      return new Set<string>();
+    }
+  };
+
+  // Save liked posts to storage
+  const saveLikedPosts = async (likedSet: Set<string>) => {
+    try {
+      if (!user) return;
+      await AsyncStorage.setItem(
+        `likedPosts_${user.id}`,
+        JSON.stringify(Array.from(likedSet))
+      );
+    } catch (error) {
+      console.error("Failed to save liked posts:", error);
+    }
+  };
+
+  // Fetch group posts
+  const fetchGroupPosts = async () => {
+    if (!id || !user) return;
+
+    try {
+      setIsLoadingPosts(true);
+      const response = await groupService.getGroupPosts(id, user.id);
+      setPosts(response.data);
+      
+      const likedSet = await loadLikedPosts();
+      setLikedPosts(likedSet);
+    } catch (error) {
+      console.error("Failed to fetch group posts:", error);
+      Alert.alert("Error", "Failed to load group posts.");
+    } finally {
+      setIsLoadingPosts(false);
+    }
+  };
+
+  // Load posts when switching to posts tab
+  useEffect(() => {
+    if (activeTab === 'posts' && posts.length === 0) {
+      fetchGroupPosts();
+    }
+  }, [activeTab, id, user]);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await Promise.all([
+      fetchGroupPosts(),
+      // Optionally refresh group data too
+    ]);
+    setRefreshing(false);
+  };
+
+  const handleLikePost = async (postId: string) => {
+    if (!user) return;
+
+    const wasLiked = likedPosts.has(postId);
+    const newIsLiked = !wasLiked;
+
+    // Optimistic UI update
+    setLikedPosts(prev => {
+      const newSet = new Set(prev);
+      if (newIsLiked) {
+        newSet.add(postId);
+      } else {
+        newSet.delete(postId);
+      }
+      saveLikedPosts(newSet);
+      return newSet;
+    });
+
+    // Optimistic posts count update
+    setPosts(prev => prev.map(post => 
+      post.id === postId 
+        ? { ...post, likesCount: post.likesCount + (newIsLiked ? 1 : -1) }
+        : post
+    ));
+
+    try {
+      const response = await api.post(`/posts/${postId}/like`, {
+        userId: user.id,
+      });
+
+      const { isLiked, likesCount } = response.data.data;
+
+      // Update with real data from server
+      setPosts(prev => prev.map(post => 
+        post.id === postId 
+          ? { ...post, likesCount }
+          : post
+      ));
+
+      // Update liked posts with real data
+      setLikedPosts(prev => {
+        const newSet = new Set(prev);
+        if (isLiked) {
+          newSet.add(postId);
+        } else {
+          newSet.delete(postId);
+        }
+        saveLikedPosts(newSet);
+        return newSet;
+      });
+
+    } catch (error) {
+      console.error("Failed to like post:", error);
+      
+      // Revert optimistic updates on error
+      setLikedPosts(prev => {
+        const newSet = new Set(prev);
+        if (wasLiked) {
+          newSet.add(postId);
+        } else {
+          newSet.delete(postId);
+        }
+        saveLikedPosts(newSet);
+        return newSet;
+      });
+
+      setPosts(prev => prev.map(post => 
+        post.id === postId 
+          ? { ...post, likesCount: post.likesCount + (wasLiked ? 1 : -1) }
+          : post
+      ));
+    }
+  };
+
+  const handleCommentPress = (post: GroupPost) => {
+    setSelectedPost(post);
+    setCommentsModalVisible(true);
+  };
+
+  const handleCommentsUpdate = (postId: string, newCount: number) => {
+    setPosts(prev => prev.map(post => 
+      post.id === postId 
+        ? { ...post, commentsCount: newCount }
+        : post
+    ));
+  };
+
+  const handleEditPost = (post: GroupPost) => {
+    setPostToEdit(post);
+    setEditModalVisible(true);
+  };
+
+  const handleDeletePost = (postId: string) => {
+    Alert.alert(
+      "Delete Post",
+      "Are you sure you want to delete this post? This action cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await api.delete(`/posts/${postId}`);
+              
+              // Remove post from local state
+              setPosts(prev => prev.filter(post => post.id !== postId));
+              
+            } catch (error: any) {
+              console.error("Failed to delete post:", error);
+              const errorMessage = error.response?.data?.message || "Failed to delete post. Please try again.";
+              Alert.alert("Error", errorMessage);
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const handlePostUpdated = (postId: string, newGeneratedText: string) => {
+    setPosts(prev => prev.map(post => 
+      post.id === postId 
+        ? { ...post, generatedText: newGeneratedText }
+        : post
+    ));
+  };
 
   const handleLeaveGroup = async () => {
     if (!group || !user) return;
@@ -112,7 +334,45 @@ export default function GroupDetailScreen() {
         </View>
       </View>
 
-      <ScrollView className="flex-1">
+      {/* Tab Navigation */}
+      <View className="bg-white border-b border-gray-200">
+        <View className="flex-row">
+          <TouchableOpacity
+            className={`flex-1 py-3 border-b-2 ${
+              activeTab === 'info' ? 'border-blue-500' : 'border-transparent'
+            }`}
+            onPress={() => setActiveTab('info')}
+          >
+            <Text className={`text-center font-medium ${
+              activeTab === 'info' ? 'text-blue-500' : 'text-gray-500'
+            }`}>
+              Info
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            className={`flex-1 py-3 border-b-2 ${
+              activeTab === 'posts' ? 'border-blue-500' : 'border-transparent'
+            }`}
+            onPress={() => setActiveTab('posts')}
+          >
+            <Text className={`text-center font-medium ${
+              activeTab === 'posts' ? 'text-blue-500' : 'text-gray-500'
+            }`}>
+              Posts ({posts.length})
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      <ScrollView 
+        className="flex-1" 
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+      >
+        {activeTab === 'info' ? (
+          // Group Info Tab
+          <>
         {/* Group Info */}
         <View className="bg-white p-6 border-b border-gray-200">
           <View className="flex-row items-center mb-4">
@@ -207,7 +467,7 @@ export default function GroupDetailScreen() {
               <Text className="text-sm text-gray-600">Members</Text>
             </View>
             <View className="items-center">
-              <Text className="text-2xl font-bold text-green-600">0</Text>
+              <Text className="text-2xl font-bold text-green-600">{posts.length}</Text>
               <Text className="text-sm text-gray-600">Posts</Text>
             </View>
             <View className="items-center">
@@ -218,7 +478,78 @@ export default function GroupDetailScreen() {
             </View>
           </View>
         </View>
+          </>
+        ) : (
+          // Posts Tab
+          <View className="p-4">
+            {isLoadingPosts ? (
+              <View className="justify-center items-center py-20">
+                <ActivityIndicator size="large" color="#3b82f6" />
+                <Text className="mt-4 text-gray-600">Loading posts...</Text>
+              </View>
+            ) : posts.length > 0 ? (
+              posts.map((post) => (
+                <View key={post.id} className="mb-4">
+                  <PostCard
+                    id={post.id}
+                    userId={post.userId}
+                    username={post.userFullName}
+                    avatar={`https://api.dicebear.com/7.x/avataaars/svg?seed=${post.userId}`}
+                    content={post.generatedText}
+                    timestamp={new Date(post.timestamp).toLocaleDateString()}
+                    likes={post.likesCount}
+                    comments={post.commentsCount}
+                    isLiked={likedPosts.has(post.id)}
+                    isOwnPost={user?.id === post.userId}
+                    onLike={() => handleLikePost(post.id)}
+                    onComment={() => handleCommentPress(post)}
+                    onEdit={() => handleEditPost(post)}
+                    onDelete={() => handleDeletePost(post.id)}
+                  />
+                </View>
+              ))
+            ) : (
+              <View className="justify-center items-center py-20">
+                <MessageCircle size={64} color="#d1d5db" />
+                <Text className="text-xl font-bold text-gray-600 mt-4 mb-2">
+                  No Posts Yet
+                </Text>
+                <Text className="text-gray-500 text-center">
+                  Be the first to share something with this group!
+                </Text>
+              </View>
+            )}
+          </View>
+        )}
       </ScrollView>
+
+      {/* Comments Modal */}
+      {selectedPost && (
+        <CommentsModal
+          visible={commentsModalVisible}
+          onClose={() => {
+            setCommentsModalVisible(false);
+            setSelectedPost(null);
+          }}
+          postId={selectedPost.id}
+          postAuthor={selectedPost.userFullName}
+          onCommentsUpdate={(count) => handleCommentsUpdate(selectedPost.id, count)}
+        />
+      )}
+
+      {/* Edit Post Modal */}
+      {postToEdit && (
+        <EditPostModal
+          visible={editModalVisible}
+          onClose={() => {
+            setEditModalVisible(false);
+            setPostToEdit(null);
+          }}
+          postId={postToEdit.id}
+          currentText={postToEdit.generatedText}
+          onPostUpdated={handlePostUpdated}
+        />
+      )}
     </View>
   );
 } 

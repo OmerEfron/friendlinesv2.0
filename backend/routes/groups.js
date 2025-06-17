@@ -12,6 +12,7 @@ const {
   leaveGroup,
   getGroup,
   getUserGroups,
+  getGroupPosts,
 } = require("../controllers/groupController");
 
 // Import middleware
@@ -106,6 +107,17 @@ router.get(
   "/user/:userId",
   validateUserIdMiddleware, // Validate user ID parameter
   getUserGroups // Controller function
+);
+
+/**
+ * GET /groups/:id/posts
+ * Get posts for a specific group
+ * Query params: userId (required for access control), page, limit
+ */
+router.get(
+  "/:id/posts",
+  validateIdMiddleware("id"), // Validate group ID parameter
+  getGroupPosts // Controller function
 );
 
 // Error handling middleware for group routes

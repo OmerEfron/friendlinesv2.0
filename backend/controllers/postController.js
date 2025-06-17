@@ -3,7 +3,7 @@
 
 const { readJson, writeJson } = require("../utils/fileUtils");
 const { generateId, validatePaginationParams } = require("../utils/validation");
-const { generateNewsflash } = require("../utils/newsflashGenerator");
+const { generateNewsflash, generateNewsflashGPT } = require("../utils/newsflashGenerator");
 const { sendPush, getFollowersTokens, getGroupMembersTokens } = require("../utils/notificationService");
 const { validateGroupAccess } = require("./groupController");
 
@@ -217,10 +217,30 @@ const createPost = async (req, res) => {
       }
     }
 
-    // Generate newsflash
+    // Generate newsflash - use deterministic in dev mode, GPT in production
     let generatedText;
     try {
-      generatedText = generateNewsflash(rawText, user.fullName);
+      // In development mode, always use deterministic generator for consistency
+      if (process.env.NODE_ENV === "development") {
+        generatedText = generateNewsflash(rawText, user.fullName);
+      } else if (process.env.OPENAI_API_KEY) {
+        // Production mode with API key - use GPT
+        try {
+          generatedText = await generateNewsflashGPT({
+            rawText,
+            userName: user.fullName,
+            tone: req.body.tone || "satirical",
+            length: req.body.length || "short",
+            temperature: req.body.temperature || 0.7,
+          });
+        } catch (gptError) {
+          console.warn("GPT newsflash generation failed, falling back to deterministic:", gptError.message);
+          generatedText = generateNewsflash(rawText, user.fullName);
+        }
+      } else {
+        // Production mode without API key - use deterministic
+        generatedText = generateNewsflash(rawText, user.fullName);
+      }
     } catch (newsflashError) {
       console.error("Newsflash generation error:", newsflashError);
       return res.status(400).json({
@@ -394,7 +414,27 @@ const updatePost = async (req, res) => {
     if (rawText !== undefined) {
       let generatedText;
       try {
-        generatedText = generateNewsflash(rawText, user.fullName);
+        // In development mode, always use deterministic generator for consistency
+        if (process.env.NODE_ENV === "development") {
+          generatedText = generateNewsflash(rawText, user.fullName);
+        } else if (process.env.OPENAI_API_KEY) {
+          // Production mode with API key - use GPT
+          try {
+            generatedText = await generateNewsflashGPT({
+              rawText,
+              userName: user.fullName,
+              tone: req.body.tone || "satirical",
+              length: req.body.length || "short",
+              temperature: req.body.temperature || 0.7,
+            });
+          } catch (gptError) {
+            console.warn("GPT newsflash generation failed, falling back to deterministic:", gptError.message);
+            generatedText = generateNewsflash(rawText, user.fullName);
+          }
+        } else {
+          // Production mode without API key - use deterministic
+          generatedText = generateNewsflash(rawText, user.fullName);
+        }
       } catch (newsflashError) {
         console.error("Newsflash generation error:", newsflashError);
         return res.status(400).json({
@@ -1185,6 +1225,114 @@ const deleteComment = async (req, res) => {
   }
 };
 
+/**
+ * Generate a newsflash preview using GPT (without creating a post)
+ * POST /posts/generate-newsflash
+ */
+const generateNewsflashPreview = async (req, res) => {
+  try {
+    const { rawText, userId, tone, length, temperature } = req.body;
+
+    // Basic validation
+    if (!rawText || typeof rawText !== 'string' || rawText.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Raw text is required",
+        error: "Please provide valid text content",
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: "User ID is required",
+        error: "Please provide a valid user ID",
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    // Read users to get the user's full name
+    const users = await readJson("users.json");
+    const user = users.find((u) => u.id === userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+        error: "No user found with the provided user ID",
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    let generatedText;
+    let method = "deterministic";
+
+    try {
+      // In development mode, always use deterministic generator for consistency
+      if (process.env.NODE_ENV === "development") {
+        generatedText = generateNewsflash(rawText, user.fullName);
+      } else if (process.env.OPENAI_API_KEY) {
+        // Production mode with API key - use GPT
+        try {
+          generatedText = await generateNewsflashGPT({
+            rawText,
+            userName: user.fullName,
+            tone: tone || "satirical",
+            length: length || "short",
+            temperature: temperature || 0.7,
+          });
+          method = "gpt";
+        } catch (gptError) {
+          console.warn("GPT newsflash generation failed, falling back to deterministic:", gptError.message);
+          generatedText = generateNewsflash(rawText, user.fullName);
+        }
+      } else {
+        // Production mode without API key - use deterministic
+        generatedText = generateNewsflash(rawText, user.fullName);
+      }
+    } catch (newsflashError) {
+      console.error("Newsflash generation error:", newsflashError);
+      return res.status(400).json({
+        success: false,
+        message: "Failed to generate newsflash",
+        error: newsflashError.message,
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Newsflash generated successfully",
+      data: {
+        rawText,
+        generatedText,
+        method,
+        user: {
+          id: user.id,
+          fullName: user.fullName,
+        },
+        options: {
+          tone: tone || "satirical",
+          length: length || "short",
+          temperature: temperature || 0.7,
+        },
+      },
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error("Generate newsflash preview error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error generating newsflash",
+      error:
+        process.env.NODE_ENV === "development"
+          ? error.message
+          : "Something went wrong",
+      timestamp: new Date().toISOString(),
+    });
+  }
+};
+
 module.exports = {
   getAllPosts,
   getPostsByUser,
@@ -1198,4 +1346,5 @@ module.exports = {
   addComment,
   getComments,
   deleteComment,
+  generateNewsflashPreview,
 };

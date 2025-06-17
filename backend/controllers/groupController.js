@@ -461,6 +461,118 @@ const getUserGroups = async (req, res) => {
 };
 
 /**
+ * Get posts for a specific group
+ * GET /api/groups/:id/posts
+ */
+const getGroupPosts = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { userId } = req.query;
+    
+    // Validate pagination parameters
+    const { page, limit } = validatePaginationParams(req.query);
+    const skip = (page - 1) * limit;
+
+    // Read data
+    const groups = await readJson("groups.json");
+    const posts = await readJson("posts.json");
+    const users = await readJson("users.json");
+
+    // Find the group
+    const group = groups.find((g) => g.id === id);
+    if (!group) {
+      return res.status(404).json({
+        success: false,
+        message: "Group not found",
+        error: "No group found with the provided ID",
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    // Check if user has access to this group
+    if (userId && !group.members.includes(userId)) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied",
+        error: "Only group members can view group posts",
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    // Filter posts that belong to this group
+    const groupPosts = posts.filter(post => 
+      post.groupIds && post.groupIds.includes(id)
+    );
+
+    // Sort posts by timestamp (newest first)
+    groupPosts.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+    // Apply pagination
+    const totalPosts = groupPosts.length;
+    const paginatedPosts = groupPosts.slice(skip, skip + limit);
+
+    // Create user lookup map
+    const userMap = users.reduce((map, user) => {
+      map[user.id] = user;
+      return map;
+    }, {});
+
+    // Enrich posts with user information
+    const enrichedPosts = paginatedPosts.map(post => {
+      const user = userMap[post.userId];
+      return {
+        id: post.id,
+        userId: post.userId,
+        userFullName: user ? user.fullName : "Unknown User",
+        rawText: post.rawText,
+        generatedText: post.generatedText,
+        timestamp: post.timestamp,
+        createdAt: post.createdAt,
+        updatedAt: post.updatedAt,
+        likesCount: post.likesCount || 0,
+        commentsCount: post.commentsCount || 0,
+        sharesCount: post.sharesCount || 0,
+        groupIds: post.groupIds || [],
+        visibility: post.visibility || "public"
+      };
+    });
+
+    const totalPages = Math.ceil(totalPosts / limit);
+
+    res.status(200).json({
+      success: true,
+      message: `Posts for group "${group.name}" retrieved successfully`,
+      data: enrichedPosts,
+      group: {
+        id: group.id,
+        name: group.name,
+        description: group.description
+      },
+      pagination: {
+        page,
+        limit,
+        totalPosts,
+        totalPages,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1
+      },
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error("Get group posts error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error retrieving group posts",
+      error:
+        process.env.NODE_ENV === "development"
+          ? error.message
+          : "Something went wrong",
+      timestamp: new Date().toISOString(),
+    });
+  }
+};
+
+/**
  * Validate group access for a user
  * Helper function for post creation
  */
@@ -489,5 +601,6 @@ module.exports = {
   leaveGroup,
   getGroup,
   getUserGroups,
+  getGroupPosts,
   validateGroupAccess,
 }; 

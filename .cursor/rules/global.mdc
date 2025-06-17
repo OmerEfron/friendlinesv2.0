@@ -1,0 +1,177 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Friendlines v2.0 – Global Project Rule
+---
+ruleType: always
+description: Global conventions, architecture decisions, and best practices for the Friendlines v2.0 monorepo (Node/Express backend + Expo/React-Native frontend). This rule **must** be applied to every AI action so generated code remains coherent, secure, and maintainable.
+version: 1.0.0
+created: 2025-06-17
+authors:
+  - name: Friendlines Core Team
+    contact: core@friendlines.app
+tags: [backend, frontend, node, express, expo, react-native, testing, ci]
+---
+
+## 1  High-Level Architecture
+1. **Backend** (`/backend`)
+   • Node.js 20, Express 4.  
+   • Stateless REST API returning **JSON only**.  
+   • Persistence: **JSON files in `/backend/data`** (groups.json, posts.json, users.json). Treat as in-memory DB; all reads & writes **must** go through `utils/fileUtils.js`.  
+   • **Controllers** ↔️ **Route modules** (1-to-1).  
+   • **Middleware** lives in `/backend/middleware` (rate-limiting, validation, auth).  
+   • **Tests** → Jest + Supertest (see `backend/tests/`). Target ≥ 90 % coverage on new code.
+
+2. **Frontend** (`/frontend`)
+   • Expo / React-Native using **expo-router** for file-system routing.  
+   • Written in **TypeScript** + **NativeWind/Tailwind**.  
+   • Screens/pages in `frontend/app`; shared UI in `frontend/components`.  
+   • Global state via React Context (see `context/…`). Prefer Context over third-party state libs.  
+   • **NEVER** fetch directly in components—wrap calls in `services/api.ts`.  
+   • Local push notifications handled by `services/notificationService.ts`.
+
+3. **Docs** live in `/backend/api_docs`; always update when API changes.
+
+---
+## 2  Coding Standards & Style
+### 2.1 Language & Syntax
+• Target **ES 2022** / modern TypeScript.  
+• Use `async/await`, optional chaining, top-level await (Node 20).  
+• **NO `var`**—use `const` or `let` only.  
+• Prefer **named exports**; default export reserved for React components or Express routers.
+
+### 2.2 Formatting & Linting
+• Follow **Prettier defaults** (2-space indent, semicolons).  
+• Keep line length ≤ 100 chars.  
+• Descriptive variable names; avoid abbreviations like `grp`.
+
+### 2.3 Error Handling
+• Wrap async controller logic in `try/catch` and call `next(err)` so the global error handler processes it.  
+• Send errors using the response shape from `/backend/api_docs/general/response_format.md`.
+
+### 2.4 Testing
+• Every new controller, utility, or complex hook **must** include corresponding tests.  
+• Backend → Jest + Supertest.  
+• Frontend logic → React-Native testing-library.  
+• Mock filesystem with `jest.mock('../utils/fileUtils.js')` when needed.
+
+---
+## 3  Backend Guidelines
+1. **Routing Pattern**
+   ```js
+   // Good pattern
+   router.post('/login', rateLimiter, validateLogin, authController.login);
+   ```
+2. **Validation** – extend functions in `middleware/validation.js`. **Do NOT** introduce Joi/Zod.  
+3. **Data Access** – always go through `readJSON` / `writeJSON` in `utils/fileUtils.js`; never `fs.readFileSync` inside controllers.  
+4. **Status Codes** – follow `/backend/api_docs/architecture/http_status_codes.md`. Example: 201 for resource creation, 422 for validation failures.  
+5. **Caching** – none yet; implement in-memory layer only after profiling.  
+6. **Rate Limiting** – auth routes limited to **5 req/min** per IP.
+
+---
+## 4  Frontend Guidelines
+1. **Component Structure**
+   ```tsx
+   interface Props { /* … */ }
+   export function PostCard({ /* … */ }: Props) {
+     // UI & hooks
+   }
+   ```
+2. **Styling** – use **NativeWind** classes; avoid StyleSheet objects unless dynamic.  
+3. **API Calls** – extend `services/api.ts` with typed helpers, e.g. `export async function joinGroup(id: string)`.  
+4. **Navigation** – file-system router; for programmatic navigation import `useRouter` from `expo-router`.  
+5. **State** – derive data from Context first; avoid prop drilling.
+
+---
+## 5  Cross-Cutting Concerns
+• **Environment Variables** – access via `process.env` (backend) and `expo-constants` (frontend). `API_URL` is mandatory.  
+• **Security** – sanitize user input, escape output, and validate all IDs.  
+• **Performance** – lazy-load heavy libraries in the frontend; prefer pagination on large lists.  
+• **Accessibility** – ensure touch targets ≥ 44 × 44 px and provide meaningful `accessibilityLabel`s.
+
+---
+## 6  Commit & PR Conventions
+• Follow **Conventional Commits** (`feat:`, `fix:`, `chore:`…).  
+• PR description **must include**: motivation, summary of changes, checklist for tests/docs.  
+• Link to relevant issues.  
+• Require ✅ from at least one reviewer before merge into `main`.
+
+---
+## 7  Verification Checklist (AI MUST run before finishing a task)
+1. **Backend**: `npm t` passes and eslint shows **no errors**.
+2. **Frontend**: `npx tsc --noEmit` passes with zero TypeScript errors.
+3. New/updated endpoints documented in `/backend/api_docs/...` and Jest coverage ≥ 90 %.
+4. Expo app starts (`npx expo start`) and new screens render on both iOS & Android simulators.
+5. All new functions, props, and context values are **fully typed**.
+6. No ESLint/Prettier violations (run `npm run lint` in both packages).
+
+---
+## 8  Quick References
+| Location | Purpose |
+| -------- | ------- |
+| `/backend/server.js` | Express app bootstrap |
+| `/backend/controllers/authController.js` | Example controller patterns |
+| `/frontend/services/api.ts` | API helper layer |
+
+---
+## 9  Common Pitfalls & Solutions
+| Pitfall | Solution |
+| ------- | -------- |
+| Direct file reads in controllers | Use `utils/fileUtils.js` instead |
+| Fetching from React component | Create/extend helper in `services/api.ts` |
+| Forgot to update docs/tests | Run Verification Checklist step 3 |
+| Untyped context value | Add explicit interface in `context/*` |
+
+---
+## 10  Deprecated Patterns (DO NOT USE)
+* `fs.readFileSync` or `fs.writeFileSync` in controllers.  
+* Inline fetch calls like `fetch('/api/groups')` inside components.  
+* Using `var` or function-scoped variables.  
+* Class-based React components (use functional + hooks only).
+
+---
+## 11  Example Pattern Library
+### Express Controller Skeleton
+```js
+// backend/controllers/exampleController.js
+import * as fileUtils from '../utils/fileUtils.js';
+
+export async function create(req, res, next) {
+  try {
+    const data = await fileUtils.readJSON('users');
+    // ...logic...
+    await fileUtils.writeJSON('users', data);
+    res.status(201).json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+}
+```
+
+### Typed API Helper
+```ts
+// frontend/services/api.ts
+export interface Group {
+  id: string;
+  name: string;
+  createdAt: string;
+}
+
+export async function fetchGroups(): Promise<Group[]> {
+  const res = await fetch(`${API_URL}/groups`);
+  if (!res.ok) throw new Error('Failed to fetch groups');
+  return res.json() as Promise<Group[]>;
+}
+```
+
+---
+## 12  Future Work & Notes
+* Migrate data layer to SQLite (planned Q3 2025).  
+* Introduce Vite for faster Web testing when web build added.  
+* Consider moving validation to **Zod** once backend migrates away from JSON storage.
+
+---
+**End of Global Rule**
+

@@ -1,0 +1,60 @@
+---
+description: 
+globs: frontend/**
+alwaysApply: false
+---
+# Friendlines – Frontend Rule
+---
+ruleType: autoAttached
+version: 1.0.0
+created: 2025-06-17
+authors:
+  - name: Friendlines Core Team
+    contact: core@friendlines.app
+---
+
+## 1  Project Scope
+Targets **all files under `/frontend`** including screens, components, context, hooks, services & tests.
+
+## 2  Environment
+• **Expo SDK 50+**.<br/>• TypeScript strict mode (`noImplicitAny`).<br/>• React Native functional components **only**.
+
+## 3  Architectural Principles
+1. **File-System Routing** via `expo-router` – every screen lives in `app/`.<br/>2. **Service Layer** – any network call **must** go through `services/api.ts` (axios).<br/>3. **Global State** – use React Context located in `context/` folders; avoid external state libraries.<br/>4. Styling with **NativeWind** classes; fall back to `StyleSheet` for dynamic styles only.
+
+## 4  Component Pattern
+```tsx
+interface Props { /* …props */ }
+export default function ExampleScreen({}: Props) {
+  const router = useRouter();
+  // hooks…
+  return (
+    <View className="flex-1 bg-white">{/* UI */}</View>
+  );
+}
+```
+• Name files in `PascalCase`. Default export only for screens/components.<br/>• Destructure props in function signature.
+
+## 5  API Layer (`services/api.ts`)
+• Centralise baseURL using `expo-constants` if available.<br/>• **No** hard-coded IPs in components.<br/>• Each helper must have a return type (e.g., `Promise<Post[]>`).
+
+## 6  Push Notifications
+• Use `services/notificationService.ts` singleton.<br/>• Register token after login.<br/>• Handle responses with deep-links via `expo-router`.
+
+## 7  Error Handling & UX
+• Wrap async calls in `try/catch` and show `Alert` with friendly message.<br/>• Optimistic UI updates allowed but must rollback on failure.<br/>• Provide `activityIndicator` for loading states.
+
+## 8  Testing
+• Use **@testing-library/react-native**.<br/>• Snapshot tests for components with branching UI.<br/>• Mock axios with `jest.mock('axios')`.
+
+## 9  Accessibility
+• Touch targets ≥ 44 × 44 px.<br/>• Add `accessibilityLabel` and `accessibilityRole` where appropriate.
+
+## 10  Performance
+• Lazy-load heavy images/components.<br/>• Paginate large lists (limit ≤ 20 by default).
+
+## 11  Deprecated Patterns (❌ DO NOT USE)
+* Inline `fetch()` in component bodies.
+* Class components.
+* `var` or non-const functional components.
+* Hard-coded colour strings – use Tailwind classes instead.

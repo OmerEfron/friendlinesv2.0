@@ -1,0 +1,66 @@
+---
+description: 
+globs: *.test.*
+alwaysApply: false
+---
+# Friendlines – Testing Rule
+---
+ruleType: autoAttached
+version: 1.0.0
+created: 2025-06-17
+authors:
+  - name: Friendlines Core Team
+    contact: core@friendlines.app
+---
+
+## 1  Tooling
+| Stack | Location |
+| ----- | -------- |
+| **Jest** | universal test runner |
+| **Supertest** | backend HTTP integration |
+| **@testing-library/react-native** | frontend component tests |
+
+## 2  Coverage Targets
+• **Backend** ≥ 90 % line + branch.<br/>• **Frontend** ≥ 90 % statements.<br/>• CI will fail if thresholds unmet.
+
+## 3  Test Patterns
+### Backend Unit Example
+```js
+import request from 'supertest';
+import app from '../server';
+
+describe('POST /api/login', () => {
+  it('creates a user', async () => {
+    const res = await request(app).post('/api/login')
+      .send({ fullName: 'Jane Doe', email: 'jane@example.com' });
+    expect(res.status).toBe(201);
+    expect(res.body.success).toBe(true);
+  });
+});
+```
+### Frontend Component Example
+```tsx
+import { render } from '@testing-library/react-native';
+import PostCard from '../../components/PostCard';
+
+test('renders post content', () => {
+  const { getByText } = render(<PostCard content="Hello" />);
+  expect(getByText('Hello')).toBeTruthy();
+});
+```
+
+## 4  Mocking
+• Mock filesystem via `jest.mock('../utils/fileUtils.js')`.<br/>• Mock axios via `jest.mock('axios')`.<br/>• For Expo APIs, use `jest-expo` presets.
+
+## 5  Performance
+• Tests must run in < 5 s locally.<br/>• Avoid network & filesystem writes – use in-memory mocks.
+
+## 6  Naming & Structure
+* Files end with `.test.js`, `.test.ts`, or `.test.tsx`.
+* Group related tests in same folder as implementation or under `tests/`.
+
+## 7  Linting in Tests
+• Disable rules sparingly using `// eslint-disable-next-line`.
+
+## 8  Continuous Integration
+• `npm t` must pass in root & individual packages.<br/>• Coverage report uploaded as artifact.

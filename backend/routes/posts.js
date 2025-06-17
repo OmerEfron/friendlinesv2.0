@@ -18,6 +18,7 @@ const {
   addComment,
   getComments,
   deleteComment,
+  generateNewsflashPreview,
 } = require("../controllers/postController");
 
 // Import middleware
@@ -56,6 +57,18 @@ router.get(
 router.get(
   "/stats",
   getPostStats // Controller function (checks NODE_ENV internally)
+);
+
+/**
+ * POST /posts/generate-newsflash
+ * Generate a newsflash preview using GPT (without creating a post)
+ * Body: { rawText, userId, tone?, length?, temperature? }
+ */
+router.post(
+  "/generate-newsflash",
+  validateContentType, // Ensure JSON content type
+  ensureBodyExists, // Ensure request body exists
+  generateNewsflashPreview // Controller function
 );
 
 /**

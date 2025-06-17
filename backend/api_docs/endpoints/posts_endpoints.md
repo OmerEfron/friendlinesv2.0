@@ -105,7 +105,10 @@ Create a new post with automatic newsflash generation.
 {
   "rawText": "I just got a new dog! 🐶",
   "userId": "u123456789",
-  "groupIds": ["g123456789", "g987654321"]
+  "groupIds": ["g123456789", "g987654321"],
+  "tone": "satirical",
+  "length": "short",
+  "temperature": 0.7
 }
 ```
 
@@ -113,6 +116,9 @@ Create a new post with automatic newsflash generation.
 - `rawText`: Required, 1-280 characters, no HTML/script tags
 - `userId`: Required, valid user ID format
 - `groupIds`: Optional array, max 5 group IDs, no duplicates
+- `tone`: Optional, newsflash tone (e.g., "satirical", "serious", "humorous", "sarcastic")
+- `length`: Optional, "short" or "long" (affects GPT generation)
+- `temperature`: Optional, 0-2 (GPT creativity level, default: 0.7)
 
 **Response (201):**
 ```json
@@ -136,6 +142,13 @@ Create a new post with automatic newsflash generation.
 }
 ```
 
+**Newsflash Generation:**
+- **Development Mode**: Always uses deterministic generation for consistency
+- **Production Mode**: Uses OpenAI GPT if `OPENAI_API_KEY` environment variable is set
+- Falls back to deterministic generation if GPT fails or API key is missing
+- GPT generation supports configurable tone, length, and temperature
+- Deterministic generation uses rule-based text transformation
+
 **Additional Group Features:**
 - If `groupIds` are provided, post visibility is set to "groups_only"
 - Group posts notify group members instead of followers
@@ -146,6 +159,61 @@ Create a new post with automatic newsflash generation.
 - `403`: Access denied to one or more groups (user not a member)
 - `404`: User not found
 - `429`: Too many posts created (rate limited)
+- `500`: Server error
+
+---
+
+### POST /api/posts/generate-newsflash
+Generate a newsflash preview using GPT (without creating a post).
+
+**Request Body:**
+```json
+{
+  "rawText": "I just got a new dog! 🐶",
+  "userId": "u123456789",
+  "tone": "satirical",
+  "length": "short",
+  "temperature": 0.7
+}
+```
+
+**Validation Rules:**
+- `rawText`: Required, 1-280 characters, no HTML/script tags
+- `userId`: Required, valid user ID format
+- `tone`: Optional, newsflash tone (default: "satirical")
+- `length`: Optional, "short" or "long" (default: "short")
+- `temperature`: Optional, 0-2 (GPT creativity level, default: 0.7)
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "message": "Newsflash generated successfully",
+  "data": {
+    "rawText": "I just got a new dog! 🐶",
+    "generatedText": "BREAKING: John Doe just adopted an adorable new canine companion! 🐶",
+    "method": "gpt",
+    "user": {
+      "id": "u123456789",
+      "fullName": "John Doe"
+    },
+    "options": {
+      "tone": "satirical",
+      "length": "short",
+      "temperature": 0.7
+    }
+  },
+  "timestamp": "2025-06-14T18:00:00.000Z"
+}
+```
+
+**Generation Methods:**
+- `"gpt"`: Generated using OpenAI GPT with provided options
+- `"deterministic"`: Generated using rule-based transformation (fallback)
+
+**Error Responses:**
+- `400`: Validation failed or newsflash generation failed
+- `404`: User not found
 - `500`: Server error
 
 ---

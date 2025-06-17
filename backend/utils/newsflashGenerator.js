@@ -188,8 +188,87 @@ const validateNewsflashInputs = (rawText, userName) => {
   };
 };
 
+/**
+ * Generate a newsflash using OpenAI's Chat Completion API (ChatGPT).
+ * This provides more natural-sounding results than the deterministic utility above.
+ *
+ * Environment requirements:
+ *   • process.env.OPENAI_API_KEY – your OpenAI secret key.
+ *   • (optional) process.env.OPENAI_CHAT_MODEL – defaults to 'gpt-3.5-turbo'.
+ *
+ * @param {Object} opts
+ * @param {string} opts.rawText     – Original user update text.
+ * @param {string} opts.userName    – Full user name (will be referenced in the prompt).
+ * @param {string} [opts.tone]      – Desired tone e.g. "serious", "humorous", "sarcastic" (defaults to "satirical").
+ * @param {number} [opts.temperature] – OpenAI temperature (0–2). Defaults to 0.7 for some creativity.
+ * @param {string} [opts.length]    – "short" or "long". Influences the prompt guideline.
+ * @param {string} [opts.model]     – Override chat model (falls back to env or 'gpt-3.5-turbo').
+ * @returns {Promise<string>}       – Generated newsflash text.
+ */
+const generateNewsflashGPT = async ({
+  rawText,
+  userName,
+  tone = "satirical",
+  temperature = 0.7,
+  length = "short",
+  model = process.env.OPENAI_CHAT_MODEL || "gpt-3.5-turbo",
+}) => {
+  // Basic validation reused from previous util
+  const { isValid, errors } = validateNewsflashInputs(rawText, userName);
+  if (!isValid) {
+    throw new Error(`Invalid inputs: ${errors.join("; ")}`);
+  }
+
+  if (!process.env.OPENAI_API_KEY) {
+    throw new Error(
+      "OPENAI_API_KEY env var is required to generate newsflash via ChatGPT"
+    );
+  }
+
+  const systemPrompt =
+    "You are an assistant that writes breaking-news style flashes for a social media app. Keep it concise, engaging, and formatted like a headline.";
+
+  // Build the user content prompt with explicit instructions
+  const userPrompt = `Write a ${tone.toLowerCase()} news flash in ${
+    length === "long" ? "2-3 sentences" : "1 concise sentence"
+  } reporting on the following user update as if it were breaking news. Avoid hashtags or mentions. End with proper punctuation.\n\nUser name: ${userName}\nUser update: ${rawText}`;
+
+  const body = {
+    model,
+    temperature,
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userPrompt },
+    ],
+  };
+
+  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    const errorPayload = await response.text();
+    throw new Error(
+      `OpenAI API error (${response.status}): ${errorPayload.slice(0, 200)}`
+    );
+  }
+
+  const json = await response.json();
+  const content = json.choices?.[0]?.message?.content;
+  if (!content) {
+    throw new Error("OpenAI response missing content");
+  }
+  return content.trim();
+};
+
 module.exports = {
   generateNewsflash,
   generateNewsflashVariations,
   validateNewsflashInputs,
+  generateNewsflashGPT,
 };

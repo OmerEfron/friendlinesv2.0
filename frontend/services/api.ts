@@ -100,15 +100,71 @@ export const groupService = {
     const response = await api.get(`/groups/user/${userId}`);
     return response.data;
   },
+
+  getGroupPosts: async (groupId: string, userId: string, page = 1, limit = 20) => {
+    const response = await api.get(`/groups/${groupId}/posts`, {
+      params: { userId, page, limit }
+    });
+    return response.data;
+  },
 };
+
+// Post interfaces
+export interface NewsflashOptions {
+  tone?: 'satirical' | 'serious' | 'humorous' | 'sarcastic' | 'excited';
+  length?: 'short' | 'long';
+  temperature?: number;
+}
+
+export interface NewsflashPreview {
+  rawText: string;
+  generatedText: string;
+  method: 'gpt' | 'deterministic';
+  user: {
+    id: string;
+    fullName: string;
+  };
+  options: {
+    tone: string;
+    length: string;
+    temperature: number;
+  };
+}
 
 // Post services (extending existing)
 export const postService = {
-  createPost: async (rawText: string, userId: string, groupIds?: string[]) => {
+  createPost: async (
+    rawText: string, 
+    userId: string, 
+    groupIds?: string[], 
+    options?: NewsflashOptions
+  ) => {
     const response = await api.post("/posts", {
       rawText,
       userId,
       ...(groupIds && groupIds.length > 0 && { groupIds }),
+      ...(options && {
+        tone: options.tone,
+        length: options.length,
+        temperature: options.temperature,
+      }),
+    });
+    return response.data;
+  },
+
+  generateNewsflashPreview: async (
+    rawText: string,
+    userId: string,
+    options?: NewsflashOptions
+  ): Promise<{ data: NewsflashPreview }> => {
+    const response = await api.post("/posts/generate-newsflash", {
+      rawText,
+      userId,
+      ...(options && {
+        tone: options.tone,
+        length: options.length,
+        temperature: options.temperature,
+      }),
     });
     return response.data;
   },
