@@ -16,6 +16,7 @@ import CommentsModal from "../../components/CommentsModal";
 import FollowListModal from "../../components/FollowListModal";
 import EditPostModal from "../../components/EditPostModal";
 import { useAuth } from "../../context/AuthContext";
+import { DebugUtils } from "../../services/debugUtils";
 
 interface Post {
   id: string;
@@ -359,6 +360,31 @@ export default function ProfileScreen() {
             </TouchableOpacity>
           )}
         </View>
+
+        {/* Debug Section (Development Only) */}
+        {__DEV__ && user && user.id === profile.id && (
+          <View className="bg-red-50 border border-red-200 rounded-lg mx-4 mb-4 p-4">
+            <Text className="text-red-800 font-bold mb-2">Debug Options</Text>
+            <TouchableOpacity
+              onPress={() => DebugUtils.clearAsyncStorage()}
+              className="bg-red-500 p-2 rounded-lg mb-2"
+            >
+              <Text className="text-white text-center font-medium">Clear All AsyncStorage</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => DebugUtils.clearUserData(user.id)}
+              className="bg-orange-500 p-2 rounded-lg mb-2"
+            >
+              <Text className="text-white text-center font-medium">Clear User Data Only</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => DebugUtils.listAllKeys()}
+              className="bg-blue-500 p-2 rounded-lg"
+            >
+              <Text className="text-white text-center font-medium">Log AsyncStorage Keys</Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* Posts Section */}
         <View className="px-4 pb-4">

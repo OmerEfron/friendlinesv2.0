@@ -1,15 +1,22 @@
 [
   {
     "id": "u1737582951001abc",
-    "fullName": "Alice Johnson",
+    "fullName": "alice friendlines",
     "email": "alice@friendlines.com",
     "createdAt": "2025-06-10T08:00:00.000Z",
-    "updatedAt": "2025-06-17T10:30:00.000Z",
-    "followers": ["u1737582951002def", "u1737582951003ghi", "u1737582951004jkl"],
-    "following": ["u1737582951002def", "u1737582951005mno"],
+    "updatedAt": "2025-06-17T03:22:40.905Z",
+    "followers": [
+      "u1737582951002def",
+      "u1737582951003ghi",
+      "u1737582951004jkl"
+    ],
+    "following": [
+      "u1737582951002def",
+      "u1737582951005mno"
+    ],
     "followersCount": 3,
     "followingCount": 2,
-    "expoPushToken": "ExponentPushToken[alice_token_12345]"
+    "expoPushToken": "ExponentPushToken[pr0N8-MG0B3bhLBTiaMwkz]"
   },
   {
     "id": "u1737582951002def",
@@ -17,8 +24,15 @@
     "email": "bob@friendlines.com",
     "createdAt": "2025-06-10T09:15:00.000Z",
     "updatedAt": "2025-06-17T11:45:00.000Z",
-    "followers": ["u1737582951001abc", "u1737582951006pqr"],
-    "following": ["u1737582951001abc", "u1737582951003ghi", "u1737582951007stu"],
+    "followers": [
+      "u1737582951001abc",
+      "u1737582951006pqr"
+    ],
+    "following": [
+      "u1737582951001abc",
+      "u1737582951003ghi",
+      "u1737582951007stu"
+    ],
     "followersCount": 2,
     "followingCount": 3,
     "expoPushToken": "ExponentPushToken[bob_token_67890]"
@@ -29,8 +43,14 @@
     "email": "charlie@friendlines.com",
     "createdAt": "2025-06-11T14:20:00.000Z",
     "updatedAt": "2025-06-17T12:15:00.000Z",
-    "followers": ["u1737582951001abc", "u1737582951002def", "u1737582951008vwx"],
-    "following": ["u1737582951004jkl"],
+    "followers": [
+      "u1737582951001abc",
+      "u1737582951002def",
+      "u1737582951008vwx"
+    ],
+    "following": [
+      "u1737582951004jkl"
+    ],
     "followersCount": 3,
     "followingCount": 1,
     "expoPushToken": "ExponentPushToken[charlie_token_abcde]"
@@ -41,8 +61,15 @@
     "email": "diana@friendlines.com",
     "createdAt": "2025-06-11T16:30:00.000Z",
     "updatedAt": "2025-06-17T09:22:00.000Z",
-    "followers": ["u1737582951001abc", "u1737582951003ghi", "u1737582951005mno", "u1737582951006pqr"],
-    "following": ["u1737582951002def"],
+    "followers": [
+      "u1737582951001abc",
+      "u1737582951003ghi",
+      "u1737582951005mno",
+      "u1737582951006pqr"
+    ],
+    "following": [
+      "u1737582951002def"
+    ],
     "followersCount": 4,
     "followingCount": 1,
     "expoPushToken": "ExponentPushToken[diana_token_fghij]"
@@ -53,8 +80,15 @@
     "email": "ethan@friendlines.com",
     "createdAt": "2025-06-12T10:45:00.000Z",
     "updatedAt": "2025-06-17T08:30:00.000Z",
-    "followers": ["u1737582951001abc", "u1737582951007stu"],
-    "following": ["u1737582951004jkl", "u1737582951006pqr", "u1737582951008vwx"],
+    "followers": [
+      "u1737582951001abc",
+      "u1737582951007stu"
+    ],
+    "following": [
+      "u1737582951004jkl",
+      "u1737582951006pqr",
+      "u1737582951008vwx"
+    ],
     "followersCount": 2,
     "followingCount": 3,
     "expoPushToken": "ExponentPushToken[ethan_token_klmno]"
@@ -65,8 +99,14 @@
     "email": "fiona@friendlines.com",
     "createdAt": "2025-06-12T13:20:00.000Z",
     "updatedAt": "2025-06-17T14:18:00.000Z",
-    "followers": ["u1737582951002def", "u1737582951004jkl", "u1737582951005mno"],
-    "following": ["u1737582951007stu"],
+    "followers": [
+      "u1737582951002def",
+      "u1737582951004jkl",
+      "u1737582951005mno"
+    ],
+    "following": [
+      "u1737582951007stu"
+    ],
     "followersCount": 3,
     "followingCount": 1,
     "expoPushToken": "ExponentPushToken[fiona_token_pqrst]"
@@ -77,8 +117,14 @@
     "email": "gabriel@friendlines.com",
     "createdAt": "2025-06-13T09:10:00.000Z",
     "updatedAt": "2025-06-17T16:45:00.000Z",
-    "followers": ["u1737582951002def", "u1737582951006pqr", "u1737582951008vwx"],
-    "following": ["u1737582951005mno"],
+    "followers": [
+      "u1737582951002def",
+      "u1737582951006pqr",
+      "u1737582951008vwx"
+    ],
+    "following": [
+      "u1737582951005mno"
+    ],
     "followersCount": 3,
     "followingCount": 1,
     "expoPushToken": "ExponentPushToken[gabriel_token_uvwxy]"
@@ -89,8 +135,14 @@
     "email": "hannah@friendlines.com",
     "createdAt": "2025-06-13T11:35:00.000Z",
     "updatedAt": "2025-06-17T13:20:00.000Z",
-    "followers": ["u1737582951003ghi", "u1737582951005mno", "u1737582951007stu"],
-    "following": ["u1737582951001abc"],
+    "followers": [
+      "u1737582951003ghi",
+      "u1737582951005mno",
+      "u1737582951007stu"
+    ],
+    "following": [
+      "u1737582951001abc"
+    ],
     "followersCount": 3,
     "followingCount": 1,
     "expoPushToken": "ExponentPushToken[hannah_token_yzabc]"
@@ -102,7 +154,10 @@
     "createdAt": "2025-06-14T15:00:00.000Z",
     "updatedAt": "2025-06-17T17:30:00.000Z",
     "followers": [],
-    "following": ["u1737582951001abc", "u1737582951002def"],
+    "following": [
+      "u1737582951001abc",
+      "u1737582951002def"
+    ],
     "followersCount": 0,
     "followingCount": 2
   },
@@ -117,5 +172,19 @@
     "followersCount": 0,
     "followingCount": 0,
     "expoPushToken": "ExponentPushToken[julia_token_defgh]"
+  },
+  {
+    "id": "umbzk1mgxyqbyp",
+    "fullName": "omer gmail",
+    "email": "omer@gmail.com",
+    "createdAt": "2025-06-16T20:36:40.065Z",
+    "updatedAt": "2025-06-17T02:20:18.177Z",
+    "followers": [],
+    "following": [
+      "umbwkyfk7vfxpx"
+    ],
+    "followersCount": 0,
+    "followingCount": 1,
+    "expoPushToken": "ExponentPushToken[ryuqAGCJOczfbwqmwPvji0]"
   }
 ]
