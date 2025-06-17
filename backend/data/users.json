@@ -38,16 +38,17 @@
   },
   {
     "id": "umbzk1mgxyqbyp",
-    "fullName": "Omer Efron",
+    "fullName": "omer gmail",
     "email": "omer@gmail.com",
     "createdAt": "2025-06-16T20:36:40.065Z",
-    "updatedAt": "2025-06-16T21:49:39.179Z",
+    "updatedAt": "2025-06-16T23:28:00.887Z",
     "followers": [],
     "following": [
       "umbwkyfk7vfxpx"
     ],
     "followersCount": 0,
-    "followingCount": 1
+    "followingCount": 1,
+    "expoPushToken": "ExponentPushToken[ryuqAGCJOczfbwqmwPvji0]"
   },
   {
     "id": "umbzoq7ot6bckr",

@@ -10,7 +10,7 @@ import {
 import { useRouter } from "expo-router";
 import { Image } from "expo-image";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { PlusCircle, User } from "lucide-react-native";
+import { PlusCircle, User, Users } from "lucide-react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import PostCard from "../components/PostCard";
 import CommentsModal from "../components/CommentsModal";
@@ -260,9 +260,17 @@ export default function HomeScreen() {
             Friendlines
           </Text>
         </View>
-        <TouchableOpacity onPress={handleProfilePress} className="p-2">
-          <User size={24} color="#4b5563" />
-        </TouchableOpacity>
+        <View className="flex-row items-center">
+          <TouchableOpacity 
+            onPress={() => router.push("/groups" as any)} 
+            className="p-2 mr-2"
+          >
+            <Users size={24} color="#4b5563" />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={handleProfilePress} className="p-2">
+            <User size={24} color="#4b5563" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Feed */}

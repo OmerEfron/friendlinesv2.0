@@ -11,40 +11,46 @@ import {
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { useRouter } from "expo-router";
-import { X, Send } from "lucide-react-native";
+import { X, Send, Users, ChevronDown } from "lucide-react-native";
 import * as Haptics from "expo-haptics";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import api from "../services/api";
+import { postService } from "../services/api";
+import { useGroups } from "../context/GroupsContext";
+import { useAuth } from "../context/AuthContext";
 
 const MAX_CHARACTERS = 280;
 
 export default function CreatePostScreen() {
   const router = useRouter();
+  const { user } = useAuth();
+  const { userGroups } = useGroups();
   const [postText, setPostText] = useState("");
+  const [selectedGroups, setSelectedGroups] = useState<string[]>([]);
+  const [showGroupSelector, setShowGroupSelector] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const remainingCharacters = MAX_CHARACTERS - postText.length;
   const isOverLimit = remainingCharacters < 0;
 
+  // Get available groups (owned + member)
+  const availableGroups = [
+    ...(userGroups?.owned || []),
+    ...(userGroups?.member || []),
+  ];
+
   const handleSubmit = async () => {
-    if (isOverLimit || !postText.trim() || isSubmitting) return;
+    if (isOverLimit || !postText.trim() || isSubmitting || !user) return;
 
     try {
       setIsSubmitting(true);
       
-      // Get the current user from AsyncStorage
-      const userString = await AsyncStorage.getItem('user');
-      if (!userString) {
-        Alert.alert('Error', 'Please log in to create a post');
-        return;
-      }
-      
-      const user = JSON.parse(userString);
-      const userId = user.id;
-      
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
-      await api.post("/posts", { rawText: postText, userId });
+      await postService.createPost(
+        postText.trim(),
+        user.id,
+        selectedGroups.length > 0 ? selectedGroups : undefined
+      );
 
       // Navigate back to home feed
       router.back();
@@ -55,6 +61,21 @@ export default function CreatePostScreen() {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const toggleGroupSelection = (groupId: string) => {
+    setSelectedGroups(prev =>
+      prev.includes(groupId)
+        ? prev.filter(id => id !== groupId)
+        : [...prev, groupId]
+    );
+  };
+
+  const getSelectedGroupNames = () => {
+    return availableGroups
+      .filter(group => selectedGroups.includes(group.id))
+      .map(group => group.name)
+      .join(", ");
   };
 
   return (
@@ -97,10 +118,92 @@ export default function CreatePostScreen() {
 
           {/* Character Counter */}
           <Text
-            className={`text-right mt-2 ${isOverLimit ? "text-red-500" : "text-gray-500"}`}
+            className={`text-right mt-2 mb-4 ${isOverLimit ? "text-red-500" : "text-gray-500"}`}
           >
             {remainingCharacters}
           </Text>
+
+          {/* Group Selection */}
+          {availableGroups.length > 0 && (
+            <View className="mb-4">
+              <TouchableOpacity
+                className="flex-row items-center justify-between p-3 bg-gray-50 rounded-lg"
+                onPress={() => setShowGroupSelector(!showGroupSelector)}
+              >
+                <View className="flex-row items-center">
+                  <Users size={20} color="#6b7280" />
+                  <Text className="text-gray-700 ml-2">
+                    {selectedGroups.length > 0
+                      ? `Post to ${selectedGroups.length} group${selectedGroups.length > 1 ? 's' : ''}`
+                      : "Post to groups (optional)"}
+                  </Text>
+                </View>
+                <ChevronDown
+                  size={20}
+                  color="#6b7280"
+                  style={{
+                    transform: [{ rotate: showGroupSelector ? "180deg" : "0deg" }],
+                  }}
+                />
+              </TouchableOpacity>
+
+              {/* Selected Groups Display */}
+              {selectedGroups.length > 0 && (
+                <Text className="text-sm text-blue-600 mt-1 ml-1">
+                  {getSelectedGroupNames()}
+                </Text>
+              )}
+
+              {/* Group Selector */}
+              {showGroupSelector && (
+                <View className="mt-3 bg-white border border-gray-200 rounded-lg">
+                  {availableGroups.map((group) => (
+                    <TouchableOpacity
+                      key={group.id}
+                      className={`flex-row items-center justify-between p-3 border-b border-gray-100 last:border-b-0 ${
+                        selectedGroups.includes(group.id) ? "bg-blue-50" : ""
+                      }`}
+                      onPress={() => toggleGroupSelection(group.id)}
+                    >
+                      <View className="flex-1">
+                        <Text className="font-medium text-gray-900">
+                          {group.name}
+                        </Text>
+                        {group.description && (
+                          <Text className="text-sm text-gray-600 mt-1">
+                            {group.description}
+                          </Text>
+                        )}
+                      </View>
+                      <View className="ml-3">
+                        <View
+                          className={`w-5 h-5 rounded border-2 ${
+                            selectedGroups.includes(group.id)
+                              ? "bg-blue-500 border-blue-500"
+                              : "border-gray-300"
+                          }`}
+                        >
+                          {selectedGroups.includes(group.id) && (
+                            <Text className="text-white text-xs text-center leading-4">
+                              ✓
+                            </Text>
+                          )}
+                        </View>
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+                  
+                  {selectedGroups.length > 0 && (
+                    <View className="p-3 bg-blue-50 border-t border-blue-200">
+                      <Text className="text-xs text-blue-800">
+                        This post will only be visible to members of the selected groups.
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              )}
+            </View>
+          )}
         </ScrollView>
       </KeyboardAvoidingView>
     </View>

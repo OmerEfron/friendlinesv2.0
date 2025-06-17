@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "test-tempo",
-    "slug": "test-tempo",
+    "name": "friendlines",
+    "slug": "friendlines",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -15,7 +15,8 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
-      }
+      },
+      "package": "com.friendlines.dev"
     },
     "web": {
       "bundler": "metro",
@@ -24,6 +25,7 @@
     },
     "plugins": [
       "expo-router",
+      "expo-dev-client",
       [
         "expo-splash-screen",
         {
@@ -36,6 +38,12 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "e6050802-af07-44f2-b6ab-2e1bf3f789d2"
+      }
     }
   }
 }

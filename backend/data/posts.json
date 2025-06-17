@@ -104,14 +104,34 @@
     "generatedText": "BREAKING: Just booked our ski lodge! winter was went to be amazing! - Sources confirm.",
     "timestamp": "2025-06-16T22:47:20.452Z",
     "createdAt": "2025-06-16T22:47:20.452Z",
-    "updatedAt": "2025-06-16T22:47:20.452Z",
+    "updatedAt": "2025-06-16T23:20:16.915Z",
     "groupIds": [
       "g1750113987799tqifb"
     ],
     "visibility": "groups_only",
-    "likes": [],
+    "likes": [
+      "umbzk1mgxyqbyp"
+    ],
     "comments": [],
-    "likesCount": 0,
+    "likesCount": 1,
+    "commentsCount": 0,
+    "sharesCount": 0
+  },
+  {
+    "id": "pmbzpudez5s2tr",
+    "userId": "umbzk1mgxyqbyp",
+    "rawText": "Test 2!",
+    "generatedText": "BREAKING: Test 2!",
+    "timestamp": "2025-06-16T23:18:59.435Z",
+    "createdAt": "2025-06-16T23:18:59.435Z",
+    "updatedAt": "2025-06-16T23:20:15.652Z",
+    "groupIds": [],
+    "visibility": "public",
+    "likes": [
+      "umbzk1mgxyqbyp"
+    ],
+    "comments": [],
+    "likesCount": 1,
     "commentsCount": 0,
     "sharesCount": 0
   }
