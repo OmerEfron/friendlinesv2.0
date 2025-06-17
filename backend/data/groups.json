@@ -1,34 +1,210 @@
 [
   {
-    "id": "g1750113987799tqifb",
-    "name": "Ski Trip 2024",
-    "description": "Planning our winter getaway!",
-    "ownerId": "umbwkyfk7vfxpx",
+    "id": "g1737582951001xyz",
+    "name": "Tech Enthusiasts",
+    "description": "Discussing the latest in technology, programming, and innovation!",
+    "ownerId": "u1737582951001abc",
     "members": [
-      "umbwkyfk7vfxpx",
-      "umbwkza44j79m8"
+      "u1737582951001abc",
+      "u1737582951002def",
+      "u1737582951003ghi",
+      "u1737582951005mno"
     ],
-    "invites": [],
-    "createdAt": "2025-06-16T22:46:27.799Z",
-    "updatedAt": "2025-06-16T22:46:45.328Z",
+    "invites": [
+      "u1737582951004jkl",
+      "u1737582951006pqr"
+    ],
+    "createdAt": "2025-06-10T10:00:00.000Z",
+    "updatedAt": "2025-06-17T14:30:00.000Z",
     "settings": {
       "postNotifications": true,
       "membershipNotifications": true
     }
   },
   {
-    "id": "g1750123575321slfd2",
-    "name": "Test group",
-    "description": "Test",
-    "ownerId": "umbzk1mgxyqbyp",
+    "id": "g1737582951002abc",
+    "name": "Fitness Warriors",
+    "description": "Motivating each other to stay fit and healthy. Share workouts, progress, and tips!",
+    "ownerId": "u1737582951002def",
     "members": [
-      "umbzk1mgxyqbyp"
+      "u1737582951002def",
+      "u1737582951004jkl",
+      "u1737582951007stu",
+      "u1737582951008vwx"
     ],
-    "invites": [],
-    "createdAt": "2025-06-17T01:26:15.321Z",
-    "updatedAt": "2025-06-17T01:26:15.321Z",
+    "invites": [
+      "u1737582951001abc"
+    ],
+    "createdAt": "2025-06-11T08:30:00.000Z",
+    "updatedAt": "2025-06-17T09:15:00.000Z",
     "settings": {
       "postNotifications": true,
+      "membershipNotifications": false
+    }
+  },
+  {
+    "id": "g1737582951003def",
+    "name": "Book Club Adventures",
+    "description": "Monthly book discussions and reading recommendations. Currently reading 'The Midnight Library'.",
+    "ownerId": "u1737582951003ghi",
+    "members": [
+      "u1737582951003ghi",
+      "u1737582951001abc",
+      "u1737582951006pqr",
+      "u1737582951008vwx",
+      "u1737582951010ab2"
+    ],
+    "invites": [],
+    "createdAt": "2025-06-12T14:20:00.000Z",
+    "updatedAt": "2025-06-17T11:45:00.000Z",
+    "settings": {
+      "postNotifications": false,
+      "membershipNotifications": true
+    }
+  },
+  {
+    "id": "g1737582951004ghi",
+    "name": "Travel Buddies",
+    "description": "Planning adventures around the world! Share travel tips, photos, and find travel companions.",
+    "ownerId": "u1737582951004jkl",
+    "members": [
+      "u1737582951004jkl",
+      "u1737582951005mno",
+      "u1737582951007stu"
+    ],
+    "invites": [
+      "u1737582951002def",
+      "u1737582951003ghi",
+      "u1737582951009yz1"
+    ],
+    "createdAt": "2025-06-13T16:45:00.000Z",
+    "updatedAt": "2025-06-17T13:20:00.000Z",
+    "settings": {
+      "postNotifications": true,
+      "membershipNotifications": true
+    }
+  },
+  {
+    "id": "g1737582951005jkl",
+    "name": "Cooking Masters",
+    "description": "Share recipes, cooking tips, and food photography. Let's become better chefs together!",
+    "ownerId": "u1737582951005mno",
+    "members": [
+      "u1737582951005mno",
+      "u1737582951006pqr"
+    ],
+    "invites": [
+      "u1737582951007stu",
+      "u1737582951008vwx",
+      "u1737582951010ab2"
+    ],
+    "createdAt": "2025-06-14T09:30:00.000Z",
+    "updatedAt": "2025-06-17T10:15:00.000Z",
+    "settings": {
+      "postNotifications": true,
+      "membershipNotifications": false
+    }
+  },
+  {
+    "id": "g1737582951006mno",
+    "name": "Movie Night Crew",
+    "description": "Weekly movie recommendations and discussions. This week: sci-fi classics!",
+    "ownerId": "u1737582951006pqr",
+    "members": [
+      "u1737582951006pqr",
+      "u1737582951001abc",
+      "u1737582951003ghi",
+      "u1737582951004jkl",
+      "u1737582951009yz1"
+    ],
+    "invites": [],
+    "createdAt": "2025-06-14T18:00:00.000Z",
+    "updatedAt": "2025-06-17T16:30:00.000Z",
+    "settings": {
+      "postNotifications": false,
+      "membershipNotifications": false
+    }
+  },
+  {
+    "id": "g1737582951007pqr",
+    "name": "Gaming Squad",
+    "description": "Coordinate game nights, share gaming news, and find teammates for multiplayer games.",
+    "ownerId": "u1737582951007stu",
+    "members": [
+      "u1737582951007stu",
+      "u1737582951002def",
+      "u1737582951008vwx"
+    ],
+    "invites": [
+      "u1737582951005mno"
+    ],
+    "createdAt": "2025-06-15T11:20:00.000Z",
+    "updatedAt": "2025-06-17T12:45:00.000Z",
+    "settings": {
+      "postNotifications": true,
+      "membershipNotifications": true
+    }
+  },
+  {
+    "id": "g1737582951008stu",
+    "name": "Art & Design Hub",
+    "description": "Share your creative work, get feedback, and discuss design trends and techniques.",
+    "ownerId": "u1737582951008vwx",
+    "members": [
+      "u1737582951008vwx",
+      "u1737582951010ab2"
+    ],
+    "invites": [
+      "u1737582951001abc",
+      "u1737582951003ghi",
+      "u1737582951006pqr"
+    ],
+    "createdAt": "2025-06-15T13:45:00.000Z",
+    "updatedAt": "2025-06-17T08:20:00.000Z",
+    "settings": {
+      "postNotifications": true,
+      "membershipNotifications": true
+    }
+  },
+  {
+    "id": "g1737582951009vwx",
+    "name": "Pet Parents United",
+    "description": "Share photos of your furry friends, pet care tips, and connect with fellow pet lovers!",
+    "ownerId": "u1737582951009yz1",
+    "members": [
+      "u1737582951009yz1"
+    ],
+    "invites": [
+      "u1737582951001abc",
+      "u1737582951004jkl",
+      "u1737582951005mno",
+      "u1737582951008vwx"
+    ],
+    "createdAt": "2025-06-16T10:30:00.000Z",
+    "updatedAt": "2025-06-17T07:15:00.000Z",
+    "settings": {
+      "postNotifications": true,
+      "membershipNotifications": true
+    }
+  },
+  {
+    "id": "g1737582951010yzx",
+    "name": "Local Events & Meetups",
+    "description": "Discover and organize local events, meetups, and community activities in our area.",
+    "ownerId": "u1737582951010ab2",
+    "members": [
+      "u1737582951010ab2",
+      "u1737582951001abc",
+      "u1737582951002def",
+      "u1737582951004jkl",
+      "u1737582951006pqr",
+      "u1737582951007stu"
+    ],
+    "invites": [],
+    "createdAt": "2025-06-16T15:20:00.000Z",
+    "updatedAt": "2025-06-17T18:00:00.000Z",
+    "settings": {
+      "postNotifications": false,
       "membershipNotifications": true
     }
   }

@@ -1,96 +1,277 @@
 [
   {
-    "id": "pmbwkynclz49yj",
-    "userId": "umbwkyfk7vfxpx",
-    "rawText": "I just adopted two puppies! 🐶🐶",
-    "generatedText": "URGENT: John Doe just adopted two puppies! 🐶🐶.",
-    "timestamp": "2025-06-14T18:39:02.325Z",
-    "createdAt": "2025-06-14T18:39:02.325Z",
-    "updatedAt": "2025-06-14T18:40:01.361Z",
-    "likes": [],
-    "comments": [],
-    "likesCount": 0,
-    "commentsCount": 0,
-    "sharesCount": 0
-  },
-  {
-    "id": "pmbwkzgwtzi72p",
-    "userId": "umbwkza44j79m8",
-    "rawText": "I am working on a secret project 🚀",
-    "generatedText": "EXCLUSIVE: Jane Smith was worked on a secret project 🚀.",
-    "timestamp": "2025-06-14T18:39:40.637Z",
-    "createdAt": "2025-06-14T18:39:40.637Z",
-    "updatedAt": "2025-06-14T18:39:40.637Z",
-    "likes": [],
-    "comments": [],
-    "likesCount": 0,
-    "commentsCount": 0,
-    "sharesCount": 0
-  },
-  {
-    "id": "pmbzk50i0e0zhi",
-    "userId": "umbzk1mgxyqbyp",
-    "rawText": "BREAKING: Test",
-    "generatedText": "BREAKING: Breaking: test.",
-    "timestamp": "2025-06-16T20:39:18.216Z",
-    "createdAt": "2025-06-16T20:39:18.216Z",
-    "updatedAt": "2025-06-16T21:54:42.724Z",
-    "likes": [],
-    "comments": [],
-    "likesCount": 0,
-    "commentsCount": 0,
-    "sharesCount": 0
-  },
-  {
-    "id": "pmbzkkoxhdarp9",
-    "userId": "umbwkyfk7vfxpx",
-    "rawText": "I just got a new dog! 🐶",
-    "generatedText": "URGENT: John Doe just got a new dog! 🐶. - Sources confirm.",
-    "timestamp": "2025-06-16T20:51:29.717Z",
-    "createdAt": "2025-06-16T20:51:29.717Z",
-    "updatedAt": "2025-06-16T20:58:27.446Z",
-    "likes": [
-      "umbzk1mgxyqbyp",
-      "umbwkyfk7vfxpx"
-    ],
-    "comments": [],
-    "likesCount": 2,
-    "commentsCount": 0,
-    "sharesCount": 0
-  },
-  {
-    "id": "pmbzku35nw6mym",
-    "userId": "umbwkyfk7vfxpx",
-    "rawText": "Testing the likes system! 👍",
-    "generatedText": "BREAKING: Testing the likes system! 👍. - Live coverage continues.",
-    "timestamp": "2025-06-16T20:58:48.059Z",
-    "createdAt": "2025-06-16T20:58:48.059Z",
-    "updatedAt": "2025-06-16T20:58:48.059Z",
-    "likes": [],
-    "comments": [],
-    "likesCount": 0,
-    "commentsCount": 0,
-    "sharesCount": 0
-  },
-  {
-    "id": "pmbzl0b15jdgto",
-    "userId": "umbwkyfk7vfxpx",
-    "rawText": "Testing frontend likes integration! 🧪",
-    "generatedText": "BREAKING: Testing frontend likes integration! 🧪. - More details to follow.",
-    "timestamp": "2025-06-16T21:03:38.201Z",
-    "createdAt": "2025-06-16T21:03:38.201Z",
-    "updatedAt": "2025-06-16T21:15:27.487Z",
-    "likes": [
-      "umbwkyfk7vfxpx",
-      "umbzk1mgxyqbyp"
-    ],
+    "id": "p1737582951001aaa",
+    "userId": "u1737582951001abc",
+    "rawText": "Just discovered an amazing new JavaScript framework! The performance improvements are incredible 🚀",
+    "generatedText": "BREAKING: Alice Johnson just discovered an amazing new JavaScript framework! The performance improvements are incredible 🚀 - Tech community buzzing with excitement.",
+    "timestamp": "2025-06-17T08:00:00.000Z",
+    "createdAt": "2025-06-17T08:00:00.000Z",
+    "updatedAt": "2025-06-17T10:30:00.000Z",
+    "groupIds": ["g1737582951001xyz"],
+    "visibility": "groups_only",
+    "likes": ["u1737582951002def", "u1737582951003ghi", "u1737582951005mno"],
     "comments": [
       {
-        "id": "mbzlfibjxr44h",
-        "userId": "umbzk1mgxyqbyp",
-        "text": "Test",
-        "timestamp": "2025-06-16T21:15:27.487Z",
-        "createdAt": "2025-06-16T21:15:27.487Z"
+        "id": "c1737582951001a1",
+        "userId": "u1737582951002def",
+        "text": "Which framework? I've been looking for something faster than React!",
+        "timestamp": "2025-06-17T08:15:00.000Z",
+        "createdAt": "2025-06-17T08:15:00.000Z"
+      },
+      {
+        "id": "c1737582951001a2",
+        "userId": "u1737582951003ghi",
+        "text": "Please share the details! Always interested in new tech.",
+        "timestamp": "2025-06-17T09:30:00.000Z",
+        "createdAt": "2025-06-17T09:30:00.000Z"
+      }
+    ],
+    "likesCount": 3,
+    "commentsCount": 2,
+    "sharesCount": 0
+  },
+  {
+    "id": "p1737582951002bbb",
+    "userId": "u1737582951002def",
+    "rawText": "Completed my first marathon today! 26.2 miles of pure determination. Feeling amazing! 🏃‍♂️💪",
+    "generatedText": "URGENT: Bob Smith completed his first marathon today! 26.2 miles of pure determination. Feeling amazing! 🏃‍♂️💪 - Athletic achievement of the day!",
+    "timestamp": "2025-06-17T07:30:00.000Z",
+    "createdAt": "2025-06-17T07:30:00.000Z",
+    "updatedAt": "2025-06-17T11:45:00.000Z",
+    "groupIds": [],
+    "visibility": "public",
+    "likes": ["u1737582951001abc", "u1737582951004jkl", "u1737582951007stu", "u1737582951008vwx"],
+    "comments": [
+      {
+        "id": "c1737582951002b1",
+        "userId": "u1737582951001abc",
+        "text": "Congratulations! That's incredible. What's your next goal?",
+        "timestamp": "2025-06-17T07:45:00.000Z",
+        "createdAt": "2025-06-17T07:45:00.000Z"
+      },
+      {
+        "id": "c1737582951002b2",
+        "userId": "u1737582951004jkl",
+        "text": "So inspiring! I need to start training for my first 5K.",
+        "timestamp": "2025-06-17T08:20:00.000Z",
+        "createdAt": "2025-06-17T08:20:00.000Z"
+      },
+      {
+        "id": "c1737582951002b3",
+        "userId": "u1737582951007stu",
+        "text": "Amazing work! How long did you train for this?",
+        "timestamp": "2025-06-17T10:15:00.000Z",
+        "createdAt": "2025-06-17T10:15:00.000Z"
+      }
+    ],
+    "likesCount": 4,
+    "commentsCount": 3,
+    "sharesCount": 0
+  },
+  {
+    "id": "p1737582951003ccc",
+    "userId": "u1737582951003ghi",
+    "rawText": "Finished reading 'The Midnight Library' - what a thought-provoking book about life's possibilities! 📚✨",
+    "generatedText": "EXCLUSIVE: Charlie Davis finished reading 'The Midnight Library' - what a thought-provoking book about life's possibilities! 📚✨ - Literary minds gather to discuss.",
+    "timestamp": "2025-06-17T06:45:00.000Z",
+    "createdAt": "2025-06-17T06:45:00.000Z",
+    "updatedAt": "2025-06-17T12:15:00.000Z",
+    "groupIds": ["g1737582951003def"],
+    "visibility": "groups_only",
+    "likes": ["u1737582951001abc", "u1737582951006pqr", "u1737582951008vwx", "u1737582951010ab2"],
+    "comments": [
+      {
+        "id": "c1737582951003c1",
+        "userId": "u1737582951001abc",
+        "text": "I loved that book! The concept of infinite lives was fascinating.",
+        "timestamp": "2025-06-17T07:00:00.000Z",
+        "createdAt": "2025-06-17T07:00:00.000Z"
+      },
+      {
+        "id": "c1737582951003c2",
+        "userId": "u1737582951006pqr",
+        "text": "Can't wait for our book club discussion next week!",
+        "timestamp": "2025-06-17T08:30:00.000Z",
+        "createdAt": "2025-06-17T08:30:00.000Z"
+      },
+      {
+        "id": "c1737582951003c3",
+        "userId": "u1737582951010ab2",
+        "text": "Just started reading it yesterday. No spoilers please! 😄",
+        "timestamp": "2025-06-17T11:20:00.000Z",
+        "createdAt": "2025-06-17T11:20:00.000Z"
+      }
+    ],
+    "likesCount": 4,
+    "commentsCount": 3,
+    "sharesCount": 0
+  },
+  {
+    "id": "p1737582951004ddd",
+    "userId": "u1737582951004jkl",
+    "rawText": "Planning a trip to Japan in the fall! Any recommendations for must-see places in Tokyo? 🇯🇵",
+    "generatedText": "BREAKING: Diana Rodriguez planning a trip to Japan in the fall! Any recommendations for must-see places in Tokyo? 🇯🇵 - Travel enthusiasts unite!",
+    "timestamp": "2025-06-17T06:00:00.000Z",
+    "createdAt": "2025-06-17T06:00:00.000Z",
+    "updatedAt": "2025-06-17T09:22:00.000Z",
+    "groupIds": ["g1737582951004ghi"],
+    "visibility": "groups_only",
+    "likes": ["u1737582951005mno", "u1737582951007stu"],
+    "comments": [
+      {
+        "id": "c1737582951004d1",
+        "userId": "u1737582951005mno",
+        "text": "Shibuya Crossing is a must! Also check out the temples in Asakusa.",
+        "timestamp": "2025-06-17T06:30:00.000Z",
+        "createdAt": "2025-06-17T06:30:00.000Z"
+      },
+      {
+        "id": "c1737582951004d2",
+        "userId": "u1737582951007stu",
+        "text": "Don't miss the fish market and try authentic ramen! I went last year - amazing experience.",
+        "timestamp": "2025-06-17T07:15:00.000Z",
+        "createdAt": "2025-06-17T07:15:00.000Z"
+      }
+    ],
+    "likesCount": 2,
+    "commentsCount": 2,
+    "sharesCount": 0
+  },
+  {
+    "id": "p1737582951005eee",
+    "userId": "u1737582951005mno",
+    "rawText": "Made homemade pasta from scratch today! The satisfaction of creating something delicious with your own hands 🍝👨‍🍳",
+    "generatedText": "URGENT: Ethan Wilson made homemade pasta from scratch today! The satisfaction of creating something delicious with your own hands 🍝👨‍🍳 - Culinary skills on display!",
+    "timestamp": "2025-06-17T05:30:00.000Z",
+    "createdAt": "2025-06-17T05:30:00.000Z",
+    "updatedAt": "2025-06-17T08:30:00.000Z",
+    "groupIds": ["g1737582951005jkl"],
+    "visibility": "groups_only",
+    "likes": ["u1737582951006pqr"],
+    "comments": [
+      {
+        "id": "c1737582951005e1",
+        "userId": "u1737582951006pqr",
+        "text": "Looks incredible! Could you share the recipe?",
+        "timestamp": "2025-06-17T05:45:00.000Z",
+        "createdAt": "2025-06-17T05:45:00.000Z"
+      }
+    ],
+    "likesCount": 1,
+    "commentsCount": 1,
+    "sharesCount": 0
+  },
+  {
+    "id": "p1737582951006fff",
+    "userId": "u1737582951006pqr",
+    "rawText": "Watched 'Blade Runner 2049' again last night. The cinematography never gets old! What's your favorite sci-fi film? 🎬",
+    "generatedText": "EXCLUSIVE: Fiona Chen watched 'Blade Runner 2049' again last night. The cinematography never gets old! What's your favorite sci-fi film? 🎬 - Cinema lovers debate ensues.",
+    "timestamp": "2025-06-17T05:00:00.000Z",
+    "createdAt": "2025-06-17T05:00:00.000Z",
+    "updatedAt": "2025-06-17T14:18:00.000Z",
+    "groupIds": ["g1737582951006mno"],
+    "visibility": "groups_only",
+    "likes": ["u1737582951001abc", "u1737582951003ghi", "u1737582951004jkl", "u1737582951009yz1"],
+    "comments": [
+      {
+        "id": "c1737582951006f1",
+        "userId": "u1737582951001abc",
+        "text": "That movie is a masterpiece! I'd say 'Interstellar' is my current favorite.",
+        "timestamp": "2025-06-17T05:15:00.000Z",
+        "createdAt": "2025-06-17T05:15:00.000Z"
+      },
+      {
+        "id": "c1737582951006f2",
+        "userId": "u1737582951003ghi",
+        "text": "Great choice! I love 'The Matrix' - still holds up after all these years.",
+        "timestamp": "2025-06-17T06:20:00.000Z",
+        "createdAt": "2025-06-17T06:20:00.000Z"
+      },
+      {
+        "id": "c1737582951006f3",
+        "userId": "u1737582951009yz1",
+        "text": "Denis Villeneuve is a master director. Can't wait for 'Dune: Part Two'!",
+        "timestamp": "2025-06-17T13:45:00.000Z",
+        "createdAt": "2025-06-17T13:45:00.000Z"
+      }
+    ],
+    "likesCount": 4,
+    "commentsCount": 3,
+    "sharesCount": 0
+  },
+  {
+    "id": "p1737582951007ggg",
+    "userId": "u1737582951007stu",
+    "rawText": "Just hit diamond rank in League of Legends! Years of practice finally paid off! 🎮💎",
+    "generatedText": "BREAKING: Gabriel Torres just hit diamond rank in League of Legends! Years of practice finally paid off! 🎮💎 - Gaming achievement unlocked!",
+    "timestamp": "2025-06-17T04:30:00.000Z",
+    "createdAt": "2025-06-17T04:30:00.000Z",
+    "updatedAt": "2025-06-17T16:45:00.000Z",
+    "groupIds": ["g1737582951007pqr"],
+    "visibility": "groups_only",
+    "likes": ["u1737582951002def", "u1737582951008vwx"],
+    "comments": [
+      {
+        "id": "c1737582951007g1",
+        "userId": "u1737582951002def",
+        "text": "Congrats! What's your main champion?",
+        "timestamp": "2025-06-17T04:45:00.000Z",
+        "createdAt": "2025-06-17T04:45:00.000Z"
+      },
+      {
+        "id": "c1737582951007g2",
+        "userId": "u1737582951008vwx",
+        "text": "That's amazing! I'm still stuck in gold. Any tips?",
+        "timestamp": "2025-06-17T05:20:00.000Z",
+        "createdAt": "2025-06-17T05:20:00.000Z"
+      }
+    ],
+    "likesCount": 2,
+    "commentsCount": 2,
+    "sharesCount": 0
+  },
+  {
+    "id": "p1737582951008hhh",
+    "userId": "u1737582951008vwx",
+    "rawText": "Finished my latest digital art piece! Mixed emotions exploring themes of connection in the digital age 🎨✨",
+    "generatedText": "URGENT: Hannah Kim finished her latest digital art piece! Mixed emotions exploring themes of connection in the digital age 🎨✨ - Artistic expression captivates viewers.",
+    "timestamp": "2025-06-17T04:00:00.000Z",
+    "createdAt": "2025-06-17T04:00:00.000Z",
+    "updatedAt": "2025-06-17T13:20:00.000Z",
+    "groupIds": ["g1737582951008stu"],
+    "visibility": "groups_only",
+    "likes": ["u1737582951010ab2"],
+    "comments": [
+      {
+        "id": "c1737582951008h1",
+        "userId": "u1737582951010ab2",
+        "text": "The colors are stunning! I love the symbolism you used.",
+        "timestamp": "2025-06-17T04:15:00.000Z",
+        "createdAt": "2025-06-17T04:15:00.000Z"
+      }
+    ],
+    "likesCount": 1,
+    "commentsCount": 1,
+    "sharesCount": 0
+  },
+  {
+    "id": "p1737582951009iii",
+    "userId": "u1737582951009yz1",
+    "rawText": "My dog Charlie learned a new trick today! He can now fetch my slippers. Such a good boy! 🐕🥿",
+    "generatedText": "BREAKING: Isaac Brown's dog Charlie learned a new trick today! He can now fetch his slippers. Such a good boy! 🐕🥿 - Pet training success story unfolds.",
+    "timestamp": "2025-06-17T03:30:00.000Z",
+    "createdAt": "2025-06-17T03:30:00.000Z",
+    "updatedAt": "2025-06-17T17:30:00.000Z",
+    "groupIds": [],
+    "visibility": "public",
+    "likes": ["u1737582951001abc", "u1737582951002def"],
+    "comments": [
+      {
+        "id": "c1737582951009i1",
+        "userId": "u1737582951001abc",
+        "text": "Aww, that's adorable! Charlie sounds like the best boy. 🐕",
+        "timestamp": "2025-06-17T03:45:00.000Z",
+        "createdAt": "2025-06-17T03:45:00.000Z"
       }
     ],
     "likesCount": 2,
@@ -98,128 +279,144 @@
     "sharesCount": 0
   },
   {
-    "id": "pmbzopo5g2uvs8",
-    "userId": "umbwkyfk7vfxpx",
-    "rawText": "Just booked our ski lodge! Winter is going to be amazing!",
-    "generatedText": "BREAKING: Just booked our ski lodge! winter was went to be amazing! - Sources confirm.",
-    "timestamp": "2025-06-16T22:47:20.452Z",
-    "createdAt": "2025-06-16T22:47:20.452Z",
-    "updatedAt": "2025-06-16T23:20:16.915Z",
-    "groupIds": [
-      "g1750113987799tqifb"
-    ],
+    "id": "p1737582951010jjj",
+    "userId": "u1737582951010ab2",
+    "rawText": "Organizing a local farmers market this weekend! Come support local vendors and enjoy fresh produce 🥕🍅",
+    "generatedText": "URGENT: Julia Martinez organizing a local farmers market this weekend! Come support local vendors and enjoy fresh produce 🥕🍅 - Community event draws attention.",
+    "timestamp": "2025-06-17T03:00:00.000Z",
+    "createdAt": "2025-06-17T03:00:00.000Z",
+    "updatedAt": "2025-06-17T15:10:00.000Z",
+    "groupIds": ["g1737582951010yzx"],
     "visibility": "groups_only",
-    "likes": [
-      "umbzk1mgxyqbyp"
+    "likes": ["u1737582951001abc", "u1737582951002def", "u1737582951004jkl", "u1737582951006pqr", "u1737582951007stu"],
+    "comments": [
+      {
+        "id": "c1737582951010j1",
+        "userId": "u1737582951001abc",
+        "text": "Great initiative! What time does it start?",
+        "timestamp": "2025-06-17T03:15:00.000Z",
+        "createdAt": "2025-06-17T03:15:00.000Z"
+      },
+      {
+        "id": "c1737582951010j2",
+        "userId": "u1737582951004jkl",
+        "text": "I'll definitely be there! Are there any organic vendors?",
+        "timestamp": "2025-06-17T04:20:00.000Z",
+        "createdAt": "2025-06-17T04:20:00.000Z"
+      },
+      {
+        "id": "c1737582951010j3",
+        "userId": "u1737582951006pqr",
+        "text": "Love supporting local businesses. Count me in!",
+        "timestamp": "2025-06-17T05:45:00.000Z",
+        "createdAt": "2025-06-17T05:45:00.000Z"
+      }
     ],
-    "comments": [],
-    "likesCount": 1,
-    "commentsCount": 0,
+    "likesCount": 5,
+    "commentsCount": 3,
     "sharesCount": 0
   },
   {
-    "id": "pmbzpudez5s2tr",
-    "userId": "umbzk1mgxyqbyp",
-    "rawText": "Test 2!",
-    "generatedText": "BREAKING: Test 2!",
-    "timestamp": "2025-06-16T23:18:59.435Z",
-    "createdAt": "2025-06-16T23:18:59.435Z",
-    "updatedAt": "2025-06-16T23:20:15.652Z",
+    "id": "p1737582951011kkk",
+    "userId": "u1737582951001abc",
+    "rawText": "Coffee shop productivity mode activated! Working on some exciting new features for our app ☕💻",
+    "generatedText": "EXCLUSIVE: Alice Johnson coffee shop productivity mode activated! Working on some exciting new features for their app ☕💻 - Development continues around the clock.",
+    "timestamp": "2025-06-17T02:30:00.000Z",
+    "createdAt": "2025-06-17T02:30:00.000Z",
+    "updatedAt": "2025-06-17T02:30:00.000Z",
     "groupIds": [],
     "visibility": "public",
-    "likes": [
-      "umbzk1mgxyqbyp"
-    ],
+    "likes": ["u1737582951002def", "u1737582951003ghi", "u1737582951008vwx"],
     "comments": [],
-    "likesCount": 1,
+    "likesCount": 3,
     "commentsCount": 0,
     "sharesCount": 0
   },
   {
-    "id": "pmbzuezv5cz8wj",
-    "userId": "umbzk1mgxyqbyp",
-    "rawText": "Test post group",
-    "generatedText": "BREAKING: Test post group.",
-    "timestamp": "2025-06-17T01:27:00.113Z",
-    "createdAt": "2025-06-17T01:27:00.113Z",
-    "updatedAt": "2025-06-17T01:27:00.113Z",
-    "groupIds": [
-      "g1750123575321slfd2"
-    ],
+    "id": "p1737582951012lll",
+    "userId": "u1737582951002def",
+    "rawText": "Morning workout complete! 45 minutes of HIIT training. Ready to tackle the day! 💪🔥",
+    "generatedText": "BREAKING: Bob Smith morning workout complete! 45 minutes of HIIT training. Ready to tackle the day! 💪🔥 - Fitness dedication inspires others.",
+    "timestamp": "2025-06-17T02:00:00.000Z",
+    "createdAt": "2025-06-17T02:00:00.000Z",
+    "updatedAt": "2025-06-17T02:00:00.000Z",
+    "groupIds": ["g1737582951002abc"],
     "visibility": "groups_only",
-    "likes": [],
-    "comments": [],
-    "likesCount": 0,
-    "commentsCount": 0,
-    "sharesCount": 0
-  },
-  {
-    "id": "pmbzuozqbtbquz",
-    "userId": "umbzk1mgxyqbyp",
-    "rawText": "Group post test",
-    "generatedText": "BREAKING: Group post test.",
-    "timestamp": "2025-06-17T01:34:46.499Z",
-    "createdAt": "2025-06-17T01:34:46.499Z",
-    "updatedAt": "2025-06-17T01:34:46.499Z",
-    "groupIds": [
-      "g1750123575321slfd2"
+    "likes": ["u1737582951004jkl", "u1737582951007stu"],
+    "comments": [
+      {
+        "id": "c1737582951012l1",
+        "userId": "u1737582951004jkl",
+        "text": "You're so consistent! Motivating me to get back to my routine.",
+        "timestamp": "2025-06-17T02:15:00.000Z",
+        "createdAt": "2025-06-17T02:15:00.000Z"
+      }
     ],
-    "visibility": "groups_only",
-    "likes": [],
-    "comments": [],
-    "likesCount": 0,
-    "commentsCount": 0,
+    "likesCount": 2,
+    "commentsCount": 1,
     "sharesCount": 0
   },
   {
-    "id": "pmbzupmpwfqtee",
-    "userId": "umbzk1mgxyqbyp",
-    "rawText": "Group test post",
-    "generatedText": "BREAKING: Group test post.",
-    "timestamp": "2025-06-17T01:35:16.292Z",
-    "createdAt": "2025-06-17T01:35:16.292Z",
-    "updatedAt": "2025-06-17T01:35:16.292Z",
-    "groupIds": [
-      "g1750123575321slfd2"
-    ],
-    "visibility": "groups_only",
-    "likes": [],
-    "comments": [],
-    "likesCount": 0,
-    "commentsCount": 0,
-    "sharesCount": 0
-  },
-  {
-    "id": "pmbzutlysfctqh",
-    "userId": "umbzk1mgxyqbyp",
-    "rawText": "Hgruj",
-    "generatedText": "BREAKING: Hgruj.",
-    "timestamp": "2025-06-17T01:38:21.940Z",
-    "createdAt": "2025-06-17T01:38:21.940Z",
-    "updatedAt": "2025-06-17T01:38:21.940Z",
-    "groupIds": [
-      "g1750123575321slfd2"
-    ],
-    "visibility": "groups_only",
-    "likes": [],
-    "comments": [],
-    "likesCount": 0,
-    "commentsCount": 0,
-    "sharesCount": 0
-  },
-  {
-    "id": "pmbzwciygwmjld",
-    "userId": "umbzk1mgxyqbyp",
-    "rawText": "I just got 5 out of 100 in my exam at university",
-    "generatedText": "URGENT: Omer gmail just got 5 out of 100 in omer's exwas at university.",
-    "timestamp": "2025-06-17T02:21:04.120Z",
-    "createdAt": "2025-06-17T02:21:04.120Z",
-    "updatedAt": "2025-06-17T02:21:04.120Z",
+    "id": "p1737582951013mmm",
+    "userId": "u1737582951003ghi",
+    "rawText": "Starting a new book today: 'Klara and the Sun' by Kazuo Ishiguro. Heard amazing things about it! 📖",
+    "generatedText": "URGENT: Charlie Davis starting a new book today: 'Klara and the Sun' by Kazuo Ishiguro. Heard amazing things about it! 📖 - Literary journey begins.",
+    "timestamp": "2025-06-17T01:30:00.000Z",
+    "createdAt": "2025-06-17T01:30:00.000Z",
+    "updatedAt": "2025-06-17T01:30:00.000Z",
     "groupIds": [],
     "visibility": "public",
-    "likes": [],
+    "likes": ["u1737582951001abc", "u1737582951008vwx"],
+    "comments": [
+      {
+        "id": "c1737582951013m1",
+        "userId": "u1737582951008vwx",
+        "text": "That book is beautiful! Ishiguro's writing is incredible.",
+        "timestamp": "2025-06-17T01:45:00.000Z",
+        "createdAt": "2025-06-17T01:45:00.000Z"
+      }
+    ],
+    "likesCount": 2,
+    "commentsCount": 1,
+    "sharesCount": 0
+  },
+  {
+    "id": "p1737582951014nnn",
+    "userId": "u1737582951005mno",
+    "rawText": "Attempting sourdough bread for the first time! The starter is finally ready after a week of feeding 🍞✨",
+    "generatedText": "BREAKING: Ethan Wilson attempting sourdough bread for the first time! The starter is finally ready after a week of feeding 🍞✨ - Baking adventure underway.",
+    "timestamp": "2025-06-17T01:00:00.000Z",
+    "createdAt": "2025-06-17T01:00:00.000Z",
+    "updatedAt": "2025-06-17T01:00:00.000Z",
+    "groupIds": [],
+    "visibility": "public",
+    "likes": ["u1737582951001abc", "u1737582951006pqr", "u1737582951008vwx"],
+    "comments": [
+      {
+        "id": "c1737582951014n1",
+        "userId": "u1737582951006pqr",
+        "text": "Sourdough is so satisfying to make! Can't wait to see how it turns out.",
+        "timestamp": "2025-06-17T01:15:00.000Z",
+        "createdAt": "2025-06-17T01:15:00.000Z"
+      }
+    ],
+    "likesCount": 3,
+    "commentsCount": 1,
+    "sharesCount": 0
+  },
+  {
+    "id": "p1737582951015ooo",
+    "userId": "u1737582951007stu",
+    "rawText": "New gaming setup is finally complete! RGB lighting, mechanical keyboard, and dual monitors. Ready for some serious gaming! 🎮⚡",
+    "generatedText": "EXCLUSIVE: Gabriel Torres new gaming setup is finally complete! RGB lighting, mechanical keyboard, and dual monitors. Ready for some serious gaming! 🎮⚡ - Gaming paradise achieved.",
+    "timestamp": "2025-06-17T00:30:00.000Z",
+    "createdAt": "2025-06-17T00:30:00.000Z",
+    "updatedAt": "2025-06-17T00:30:00.000Z",
+    "groupIds": [],
+    "visibility": "public",
+    "likes": ["u1737582951002def", "u1737582951008vwx"],
     "comments": [],
-    "likesCount": 0,
+    "likesCount": 2,
     "commentsCount": 0,
     "sharesCount": 0
   }
