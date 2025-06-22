@@ -3,3 +3,37 @@ description:
 globs:
 alwaysApply: false
 ---
+# Friendlines – Documentation Rule
+---
+ruleType: manual
+version: 1.0.0
+created: 2025-06-17
+authors:
+  - name: Friendlines Core Team
+    contact: core@friendlines.app
+---
+
+## Purpose
+Ensure any code change that affects API behaviour is mirrored in `/backend/api_docs` and high-level `API_DOCUMENTATION.md`.
+
+## When to Invoke
+Trigger this rule **when**:
+1. Adding/updating/deleting Express routes.
+2. Modifying response shapes or status codes.
+3. Introducing new models or fields.
+4. Changing validation rules or rate limits.
+
+## Checklist
+- [ ] Update or create the corresponding markdown under `/backend/api_docs/**`.
+- [ ] If endpoints were added/removed, regenerate tables in `api_docs/endpoints/*`.
+- [ ] Run `npm run docs:lint` (custom script) to validate links & front-matter.
+- [ ] Keep examples up to date with sample payloads.
+
+## Style Guide
+• Use **present tense**, active voice.<br/>• Headers: `##` for top-level, `###` for endpoint methods.<br/>• Include **Request**, **Response**, **Error Responses** sections.<br/>• All JSON blocks must be **pretty-printed** with 2-space indent.<br/>• Provide example `curl` commands.
+
+## Tools
+A helper script `backend/split_api_docs.js` splits unified docs; rerun after big changes.
+
+## Verification
+CI step `docs-check` ensures no broken links or missing endpoint references. Fix failures before merging.
