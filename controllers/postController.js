@@ -1,7 +1,7 @@
 // Post controller for Friendlines
 // Contains business logic for managing newsflash posts
 
-const { readJson, writeJson } = require("../utils/fileUtils");
+const { readJson, writeJson } = require("../utils/dbUtils");
 const { generateId, validatePaginationParams } = require("../utils/validation");
 const { generateNewsflash, generateNewsflashGPT } = require("../utils/newsflashGenerator");
 const { sendPush, getFollowersTokens, getGroupMembersTokens } = require("../utils/notificationService");

@@ -1,4 +1,4 @@
-const { readJson, writeJson, generateId } = require('../utils/fileUtils');
+const { readJson, writeJson, generateId } = require('../utils/dbUtils');
 const { isValidId, validatePaginationParams } = require('../utils/validation');
 
 const getUserNotifications = async (req, res, next) => {

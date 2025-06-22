@@ -1,7 +1,7 @@
 // Group controller for Friendlines
 // Contains business logic for managing groups
 
-const { readJson, writeJson, generateId } = require("../utils/fileUtils");
+const { readJson, writeJson, generateId } = require("../utils/dbUtils");
 const { validatePaginationParams } = require("../utils/validation");
 
 /**

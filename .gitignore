@@ -142,6 +142,9 @@ ecosystem.config.js
 *.sqlite
 *.sqlite3
 
+# SQLite database for development (uncomment to track in git)
+# data/friendlines.db
+
 # Backup files
 *.backup
 *.bak

@@ -5,7 +5,7 @@ const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
 const path = require("path");
-const { initializeDataFiles } = require("./utils/fileUtils");
+const { initializeDatabase, initializeDataFiles, closeDatabase } = require("./utils/dbUtils");
 const uploadRoutes = require('./routes/upload');
 const notificationRoutes = require('./routes/notifications');
 const socialRoutes = require('./routes/social');
@@ -249,11 +249,13 @@ app.use((error, req, res, next) => {
 // Graceful shutdown handling
 process.on("SIGTERM", () => {
   console.log("📦 SIGTERM received, shutting down gracefully...");
+  closeDatabase();
   process.exit(0);
 });
 
 process.on("SIGINT", () => {
   console.log("📦 SIGINT received, shutting down gracefully...");
+  closeDatabase();
   process.exit(0);
 });
 
@@ -262,7 +264,11 @@ const startServer = async () => {
   try {
     console.log("🔧 Initializing Friendlines Backend...");
 
-    // Initialize data files
+    // Initialize database
+    await initializeDatabase();
+    console.log("✅ Database initialized");
+
+    // Initialize data files (includes migration)
     await initializeDataFiles();
     console.log("✅ Data files initialized");
 

@@ -3,7 +3,7 @@
 
 const express = require("express");
 const router = express.Router();
-const { writeJson } = require("../utils/fileUtils");
+const { writeJson } = require("../utils/dbUtils");
 const { resetLimiter } = require("../middleware/rateLimiter");
 
 /**
@@ -75,7 +75,7 @@ router.get("/status", async (req, res) => {
       });
     }
 
-    const { readJson } = require("../utils/fileUtils");
+    const { readJson } = require("../utils/dbUtils");
 
     // Read current data to show status
     const users = await readJson("users.json");

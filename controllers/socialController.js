@@ -1,4 +1,4 @@
-const { readJson } = require('../utils/fileUtils');
+const { readJson } = require('../utils/dbUtils');
 const { isValidId, validatePaginationParams } = require('../utils/validation');
 
 const getMutualFriends = async (req, res, next) => {

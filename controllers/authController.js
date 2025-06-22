@@ -1,7 +1,7 @@
 // Authentication controller for Friendlines
 // Contains business logic for user authentication
 
-const { readJson, writeJson } = require("../utils/fileUtils");
+const { readJson, writeJson } = require("../utils/dbUtils");
 const { generateId, isValidId, validateProfileUpdateData } = require("../utils/validation");
 const { registerDevice } = require("../utils/notificationService");
 

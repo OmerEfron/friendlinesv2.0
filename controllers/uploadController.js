@@ -1,7 +1,7 @@
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs').promises;
-const { readJson, writeJson } = require('../utils/fileUtils');
+const { readJson, writeJson } = require('../utils/dbUtils');
 const { isValidId } = require('../utils/validation');
 
 // Configure multer for image uploads
