@@ -19,8 +19,8 @@ router.get('/users/:id/friend-suggestions',
   getFriendSuggestions
 );
 
-// Bulk follow status check
-router.post('/users/follow-status',
+// Bulk friendship status check
+router.post('/users/friendship-status',
   getGeneralLimiter(),
   ensureBodyExists,
   bulkFollowStatus

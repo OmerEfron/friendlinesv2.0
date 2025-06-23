@@ -5,9 +5,9 @@
     "email": "john.doe@example.com",
     "createdAt": "2025-06-22T00:02:48.025Z",
     "updatedAt": "2025-06-22T00:02:48.049Z",
-    "followers": [],
-    "following": [],
-    "followersCount": 0,
-    "followingCount": 0
+    "friends": [],
+    "friendRequests": [],
+    "sentFriendRequests": [],
+    "friendsCount": 0
   }
 ]

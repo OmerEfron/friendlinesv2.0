@@ -37,11 +37,11 @@ const getMutualFriends = async (req, res, next) => {
       });
     }
 
-    // Find mutual connections (users who follow both)
-    const user1Following = user1.following || [];
-    const user2Following = user2.following || [];
+    // Find mutual connections (users who are friends with both)
+    const user1Friends = user1.friends || [];
+    const user2Friends = user2.friends || [];
     
-    const mutualFriendIds = user1Following.filter(id => user2Following.includes(id));
+    const mutualFriendIds = user1Friends.filter(id => user2Friends.includes(id));
     
     // Get user details for mutual friends
     const mutualFriends = users
@@ -50,8 +50,7 @@ const getMutualFriends = async (req, res, next) => {
         id: u.id,
         fullName: u.fullName,
         avatar: u.avatar,
-        followersCount: u.followersCount || 0,
-        followingCount: u.followingCount || 0
+        friendsCount: u.friendsCount || 0
       }));
 
     // Implement pagination
@@ -106,18 +105,17 @@ const getFriendSuggestions = async (req, res, next) => {
       });
     }
 
-    const following = currentUser.following || [];
-    const followers = currentUser.followers || [];
+    const friends = currentUser.friends || [];
 
-    // Simple suggestion algorithm: friends of friends who user doesn't follow
+    // Simple suggestion algorithm: friends of friends who user isn't friends with
     const suggestions = new Set();
     
-    // Get people followed by people you follow
-    following.forEach(followingId => {
-      const followedUser = users.find(u => u.id === followingId);
-      if (followedUser?.following) {
-        followedUser.following.forEach(suggestedId => {
-          if (suggestedId !== id && !following.includes(suggestedId)) {
+    // Get people who are friends with your friends
+    friends.forEach(friendId => {
+      const friend = users.find(u => u.id === friendId);
+      if (friend?.friends) {
+        friend.friends.forEach(suggestedId => {
+          if (suggestedId !== id && !friends.includes(suggestedId)) {
             suggestions.add(suggestedId);
           }
         });
@@ -133,8 +131,8 @@ const getFriendSuggestions = async (req, res, next) => {
           id: user.id,
           fullName: user.fullName,
           avatar: user.avatar,
-          followersCount: user.followersCount || 0,
-          mutualFriends: (user.followers || []).filter(f => following.includes(f)).length
+          friendsCount: user.friendsCount || 0,
+          mutualFriends: (user.friends || []).filter(f => friends.includes(f)).length
         } : null;
       })
       .filter(Boolean);
@@ -175,8 +173,9 @@ const bulkFollowStatus = async (req, res, next) => {
       });
     }
 
-    const following = currentUser.following || [];
-    const followers = currentUser.followers || [];
+    const friends = currentUser.friends || [];
+    const sentRequests = currentUser.sentFriendRequests || [];
+    const receivedRequests = currentUser.friendRequests || [];
 
     const statusResults = targetUserIds.map(targetId => {
       if (!isValidId(targetId)) {
@@ -188,26 +187,38 @@ const bulkFollowStatus = async (req, res, next) => {
         return { userId: targetId, error: 'User not found' };
       }
 
-      const targetFollowing = targetUser.following || [];
+      const areFriends = friends.includes(targetId);
+      const requestSent = sentRequests.includes(targetId);
+      const requestReceived = receivedRequests.includes(targetId);
+
+      let status = 'none';
+      if (areFriends) {
+        status = 'friends';
+      } else if (requestSent) {
+        status = 'request_sent';
+      } else if (requestReceived) {
+        status = 'request_received';
+      }
 
       return {
         userId: targetId,
         fullName: targetUser.fullName,
-        isFollowing: following.includes(targetId),
-        isFollowedBy: targetFollowing.includes(userId),
-        mutualFollow: following.includes(targetId) && targetFollowing.includes(userId)
+        status: status,
+        areFriends: areFriends,
+        requestSent: requestSent,
+        requestReceived: requestReceived
       };
     });
 
     res.status(200).json({
       success: true,
-      message: 'Bulk follow status retrieved successfully',
+      message: 'Bulk friendship status retrieved successfully',
       data: statusResults,
       timestamp: new Date().toISOString()
     });
 
   } catch (error) {
-    console.error('Error getting bulk follow status:', error);
+    console.error('Error getting bulk friendship status:', error);
     next(error);
   }
 };

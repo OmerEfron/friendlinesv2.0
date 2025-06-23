@@ -39,11 +39,11 @@ const login = async (req, res) => {
         email,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-        // Social features
-        followers: [], // Array of user IDs who follow this user
-        following: [], // Array of user IDs this user follows
-        followersCount: 0, // Denormalized count for performance
-        followingCount: 0, // Denormalized count for performance
+        // Friendship features
+        friends: [], // Array of user IDs who are friends with this user
+        friendRequests: [], // Array of user IDs who sent friend requests
+        sentFriendRequests: [], // Array of user IDs to whom this user sent friend requests
+        friendsCount: 0, // Denormalized count for performance
       };
 
       users.push(user);
@@ -59,9 +59,8 @@ const login = async (req, res) => {
       email: user.email,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
-      // Social features
-      followersCount: user.followersCount || 0,
-      followingCount: user.followingCount || 0,
+      // Friendship features
+      friendsCount: user.friendsCount || 0,
     };
 
     res.status(200).json({
@@ -117,9 +116,8 @@ const getUserProfile = async (req, res) => {
       email: user.email,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
-      // Social features
-      followersCount: user.followersCount || 0,
-      followingCount: user.followingCount || 0,
+      // Friendship features
+      friendsCount: user.friendsCount || 0,
     };
 
     res.status(200).json({
@@ -168,9 +166,8 @@ const getAllUsers = async (req, res) => {
       email: user.email,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
-      // Social features
-      followersCount: user.followersCount || 0,
-      followingCount: user.followingCount || 0,
+      // Friendship features
+      friendsCount: user.friendsCount || 0,
     }));
 
     res.status(200).json({
@@ -300,10 +297,10 @@ const getUserStats = async (req, res) => {
 };
 
 /**
- * Follow or unfollow a user
- * POST /users/:id/follow
+ * Send friend request to a user
+ * POST /users/:id/friend-request
  */
-const followUser = async (req, res) => {
+const sendFriendRequest = async (req, res) => {
   try {
     const { id } = req.params; // Target user ID
     const { userId } = req.body; // Current user ID
@@ -313,17 +310,17 @@ const followUser = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: "User ID is required",
-        error: "Valid user ID must be provided to follow a user",
+        error: "Valid user ID must be provided to send a friend request",
         timestamp: new Date().toISOString(),
       });
     }
 
-    // Prevent users from following themselves
+    // Prevent users from sending friend request to themselves
     if (id === userId) {
       return res.status(400).json({
         success: false,
-        message: "Cannot follow yourself",
-        error: "Users cannot follow themselves",
+        message: "Cannot send friend request to yourself",
+        error: "Users cannot send friend requests to themselves",
         timestamp: new Date().toISOString(),
       });
     }
@@ -356,33 +353,42 @@ const followUser = async (req, res) => {
     const targetUser = users[targetUserIndex];
     const currentUser = users[currentUserIndex];
 
-    // Ensure follow arrays exist (for backward compatibility)
-    if (!targetUser.followers) {
-      targetUser.followers = [];
-    }
-    if (!currentUser.following) {
-      currentUser.following = [];
-    }
+    // Initialize friendship-related arrays if they don't exist
+    if (!targetUser.friendRequests) targetUser.friendRequests = [];
+    if (!currentUser.sentFriendRequests) currentUser.sentFriendRequests = [];
+    if (!targetUser.friends) targetUser.friends = [];
+    if (!currentUser.friends) currentUser.friends = [];
 
-    // Check if current user is already following target user
-    const isFollowing = targetUser.followers.includes(userId);
-    let action = "";
-
-    if (isFollowing) {
-      // Unfollow: remove from both arrays
-      targetUser.followers = targetUser.followers.filter((followerId) => followerId !== userId);
-      currentUser.following = currentUser.following.filter((followingId) => followingId !== id);
-      action = "unfollowed";
-    } else {
-      // Follow: add to both arrays
-      targetUser.followers.push(userId);
-      currentUser.following.push(id);
-      action = "followed";
+    // Check if they're already friends
+    if (targetUser.friends.includes(userId)) {
+      return res.status(400).json({
+        success: false,
+        message: "You are already friends with this user",
+        timestamp: new Date().toISOString(),
+      });
     }
 
-    // Update denormalized counts
-    targetUser.followersCount = targetUser.followers.length;
-    currentUser.followingCount = currentUser.following.length;
+    // Check if friend request already exists
+    if (targetUser.friendRequests.includes(userId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Friend request already sent",
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    // Check if target user has already sent a request to current user
+    if (currentUser.friendRequests && currentUser.friendRequests.includes(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "This user has already sent you a friend request. Accept it instead.",
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    // Add friend request
+    targetUser.friendRequests.push(userId);
+    currentUser.sentFriendRequests.push(id);
 
     // Update timestamps
     targetUser.updatedAt = new Date().toISOString();
@@ -395,26 +401,23 @@ const followUser = async (req, res) => {
     // Save updated users
     await writeJson("users.json", users);
 
-    console.log(`${currentUser.fullName} ${action} ${targetUser.fullName}`);
+    console.log(`${currentUser.fullName} sent friend request to ${targetUser.fullName}`);
 
     res.status(200).json({
       success: true,
-      message: `User ${action} successfully`,
+      message: "Friend request sent successfully",
       data: {
         targetUserId: id,
         currentUserId: userId,
-        isFollowing: !isFollowing,
-        followersCount: targetUser.followersCount,
-        followingCount: currentUser.followingCount,
-        action: action,
+        requestSent: true,
       },
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    console.error("Follow user error:", error);
+    console.error("Send friend request error:", error);
     res.status(500).json({
       success: false,
-      message: "Internal server error following user",
+      message: "Internal server error sending friend request",
       error:
         process.env.NODE_ENV === "development"
           ? error.message
@@ -425,204 +428,20 @@ const followUser = async (req, res) => {
 };
 
 /**
- * Get followers for a user
- * GET /users/:id/followers
+ * Accept friend request from a user
+ * POST /users/:id/accept-friend
  */
-const getFollowers = async (req, res) => {
+const acceptFriendRequest = async (req, res) => {
   try {
-    const { id } = req.params;
-    const { page = 1, limit = 20 } = req.query;
-
-    // Validate pagination parameters
-    const validatedParams = { page: parseInt(page) || 1, limit: Math.min(parseInt(limit) || 20, 50) };
-    
-    if (validatedParams.page < 1) validatedParams.page = 1;
-    if (validatedParams.limit < 1) validatedParams.limit = 20;
-
-    // Read users
-    const users = await readJson("users.json");
-
-    // Find the target user
-    const targetUser = users.find((u) => u.id === id);
-    if (!targetUser) {
-      return res.status(404).json({
-        success: false,
-        message: "User not found",
-        error: "No user found with the provided ID",
-        timestamp: new Date().toISOString(),
-      });
-    }
-
-    // Ensure followers array exists (for backward compatibility)
-    const followers = targetUser.followers || [];
-
-    // Calculate pagination
-    const totalFollowers = followers.length;
-    const totalPages = Math.ceil(totalFollowers / validatedParams.limit);
-    const startIndex = (validatedParams.page - 1) * validatedParams.limit;
-    const endIndex = startIndex + validatedParams.limit;
-
-    // Get paginated follower IDs
-    const paginatedFollowerIds = followers.slice(startIndex, endIndex);
-
-    // Create a user lookup map for better performance
-    const userMap = users.reduce((map, user) => {
-      map[user.id] = user;
-      return map;
-    }, {});
-
-    // Enrich followers with user information
-    const enrichedFollowers = paginatedFollowerIds.map((followerId) => {
-      const follower = userMap[followerId];
-      return {
-        id: followerId,
-        fullName: follower ? follower.fullName : "Unknown User",
-        email: follower ? follower.email : null,
-        followersCount: follower ? (follower.followersCount || 0) : 0,
-        followingCount: follower ? (follower.followingCount || 0) : 0,
-      };
-    });
-
-    res.status(200).json({
-      success: true,
-      message: "User followers retrieved successfully",
-      data: {
-        userId: id,
-        userName: targetUser.fullName,
-        followersCount: totalFollowers,
-        followers: enrichedFollowers,
-      },
-      pagination: {
-        page: validatedParams.page,
-        limit: validatedParams.limit,
-        totalFollowers,
-        totalPages,
-        hasNextPage: validatedParams.page < totalPages,
-        hasPrevPage: validatedParams.page > 1,
-      },
-      timestamp: new Date().toISOString(),
-    });
-  } catch (error) {
-    console.error("Get followers error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Internal server error retrieving followers",
-      error:
-        process.env.NODE_ENV === "development"
-          ? error.message
-          : "Something went wrong",
-      timestamp: new Date().toISOString(),
-    });
-  }
-};
-
-/**
- * Get following for a user
- * GET /users/:id/following
- */
-const getFollowing = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { page = 1, limit = 20 } = req.query;
-
-    // Validate pagination parameters
-    const validatedParams = { page: parseInt(page) || 1, limit: Math.min(parseInt(limit) || 20, 50) };
-    
-    if (validatedParams.page < 1) validatedParams.page = 1;
-    if (validatedParams.limit < 1) validatedParams.limit = 20;
-
-    // Read users
-    const users = await readJson("users.json");
-
-    // Find the target user
-    const targetUser = users.find((u) => u.id === id);
-    if (!targetUser) {
-      return res.status(404).json({
-        success: false,
-        message: "User not found",
-        error: "No user found with the provided ID",
-        timestamp: new Date().toISOString(),
-      });
-    }
-
-    // Ensure following array exists (for backward compatibility)
-    const following = targetUser.following || [];
-
-    // Calculate pagination
-    const totalFollowing = following.length;
-    const totalPages = Math.ceil(totalFollowing / validatedParams.limit);
-    const startIndex = (validatedParams.page - 1) * validatedParams.limit;
-    const endIndex = startIndex + validatedParams.limit;
-
-    // Get paginated following IDs
-    const paginatedFollowingIds = following.slice(startIndex, endIndex);
-
-    // Create a user lookup map for better performance
-    const userMap = users.reduce((map, user) => {
-      map[user.id] = user;
-      return map;
-    }, {});
-
-    // Enrich following with user information
-    const enrichedFollowing = paginatedFollowingIds.map((followingId) => {
-      const followedUser = userMap[followingId];
-      return {
-        id: followingId,
-        fullName: followedUser ? followedUser.fullName : "Unknown User",
-        email: followedUser ? followedUser.email : null,
-        followersCount: followedUser ? (followedUser.followersCount || 0) : 0,
-        followingCount: followedUser ? (followedUser.followingCount || 0) : 0,
-      };
-    });
-
-    res.status(200).json({
-      success: true,
-      message: "User following retrieved successfully",
-      data: {
-        userId: id,
-        userName: targetUser.fullName,
-        followingCount: totalFollowing,
-        following: enrichedFollowing,
-      },
-      pagination: {
-        page: validatedParams.page,
-        limit: validatedParams.limit,
-        totalFollowing,
-        totalPages,
-        hasNextPage: validatedParams.page < totalPages,
-        hasPrevPage: validatedParams.page > 1,
-      },
-      timestamp: new Date().toISOString(),
-    });
-  } catch (error) {
-    console.error("Get following error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Internal server error retrieving following",
-      error:
-        process.env.NODE_ENV === "development"
-          ? error.message
-          : "Something went wrong",
-      timestamp: new Date().toISOString(),
-    });
-  }
-};
-
-/**
- * Get follow status between two users
- * GET /users/:id/follow-status?userId=currentUserId
- */
-const getFollowStatus = async (req, res) => {
-  try {
-    const { id } = req.params; // Target user ID
-    const { userId } = req.query; // Current user ID
+    const { id } = req.params; // User who sent the request
+    const { userId } = req.body; // Current user ID (who is accepting)
 
     // Validate userId
     if (!userId || typeof userId !== "string" || userId.trim().length === 0) {
       return res.status(400).json({
         success: false,
         message: "User ID is required",
-        error: "Valid user ID must be provided as query parameter",
+        error: "Valid user ID must be provided to accept a friend request",
         timestamp: new Date().toISOString(),
       });
     }
@@ -630,7 +449,641 @@ const getFollowStatus = async (req, res) => {
     // Read users
     const users = await readJson("users.json");
 
-    // Find both users  
+    // Find both users
+    const requesterUserIndex = users.findIndex((u) => u.id === id);
+    const currentUserIndex = users.findIndex((u) => u.id === userId);
+
+    if (requesterUserIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        message: "Requester user not found",
+        error: "No user found with the provided requester ID",
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    if (currentUserIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        message: "Current user not found",
+        error: "No user found with the provided current user ID",
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    const requesterUser = users[requesterUserIndex];
+    const currentUser = users[currentUserIndex];
+
+    // Initialize arrays if they don't exist
+    if (!currentUser.friendRequests) currentUser.friendRequests = [];
+    if (!requesterUser.sentFriendRequests) requesterUser.sentFriendRequests = [];
+    if (!currentUser.friends) currentUser.friends = [];
+    if (!requesterUser.friends) requesterUser.friends = [];
+
+    // Check if friend request exists
+    if (!currentUser.friendRequests.includes(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "No friend request found from this user",
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    // Remove from friend requests and sent requests
+    currentUser.friendRequests = currentUser.friendRequests.filter(reqId => reqId !== id);
+    requesterUser.sentFriendRequests = requesterUser.sentFriendRequests.filter(reqId => reqId !== userId);
+
+    // Add to friends lists
+    currentUser.friends.push(id);
+    requesterUser.friends.push(userId);
+
+    // Update friend counts
+    currentUser.friendsCount = currentUser.friends.length;
+    requesterUser.friendsCount = requesterUser.friends.length;
+
+    // Update timestamps
+    currentUser.updatedAt = new Date().toISOString();
+    requesterUser.updatedAt = new Date().toISOString();
+
+    // Update users in array
+    users[currentUserIndex] = currentUser;
+    users[requesterUserIndex] = requesterUser;
+
+    // Save updated users
+    await writeJson("users.json", users);
+
+    console.log(`${currentUser.fullName} accepted friend request from ${requesterUser.fullName}`);
+
+    res.status(200).json({
+      success: true,
+      message: "Friend request accepted successfully",
+      data: {
+        requesterUserId: id,
+        currentUserId: userId,
+        areFriends: true,
+        friendsCount: currentUser.friendsCount,
+      },
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error("Accept friend request error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error accepting friend request",
+      error:
+        process.env.NODE_ENV === "development"
+          ? error.message
+          : "Something went wrong",
+      timestamp: new Date().toISOString(),
+    });
+  }
+};
+
+/**
+ * Reject friend request from a user
+ * POST /users/:id/reject-friend
+ */
+const rejectFriendRequest = async (req, res) => {
+  try {
+    const { id } = req.params; // User who sent the request
+    const { userId } = req.body; // Current user ID (who is rejecting)
+
+    // Validate userId
+    if (!userId || typeof userId !== "string" || userId.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "User ID is required",
+        error: "Valid user ID must be provided to reject a friend request",
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    // Read users
+    const users = await readJson("users.json");
+
+    // Find both users
+    const requesterUserIndex = users.findIndex((u) => u.id === id);
+    const currentUserIndex = users.findIndex((u) => u.id === userId);
+
+    if (requesterUserIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        message: "Requester user not found",
+        error: "No user found with the provided requester ID",
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    if (currentUserIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        message: "Current user not found",
+        error: "No user found with the provided current user ID",
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    const requesterUser = users[requesterUserIndex];
+    const currentUser = users[currentUserIndex];
+
+    // Initialize arrays if they don't exist
+    if (!currentUser.friendRequests) currentUser.friendRequests = [];
+    if (!requesterUser.sentFriendRequests) requesterUser.sentFriendRequests = [];
+
+    // Check if friend request exists
+    if (!currentUser.friendRequests.includes(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "No friend request found from this user",
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    // Remove from friend requests and sent requests
+    currentUser.friendRequests = currentUser.friendRequests.filter(reqId => reqId !== id);
+    requesterUser.sentFriendRequests = requesterUser.sentFriendRequests.filter(reqId => reqId !== userId);
+
+    // Update timestamps
+    currentUser.updatedAt = new Date().toISOString();
+    requesterUser.updatedAt = new Date().toISOString();
+
+    // Update users in array
+    users[currentUserIndex] = currentUser;
+    users[requesterUserIndex] = requesterUser;
+
+    // Save updated users
+    await writeJson("users.json", users);
+
+    console.log(`${currentUser.fullName} rejected friend request from ${requesterUser.fullName}`);
+
+    res.status(200).json({
+      success: true,
+      message: "Friend request rejected successfully",
+      data: {
+        requesterUserId: id,
+        currentUserId: userId,
+        requestRejected: true,
+      },
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error("Reject friend request error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error rejecting friend request",
+      error:
+        process.env.NODE_ENV === "development"
+          ? error.message
+          : "Something went wrong",
+      timestamp: new Date().toISOString(),
+    });
+  }
+};
+
+/**
+ * Cancel sent friend request
+ * POST /users/:id/cancel-friend-request
+ */
+const cancelFriendRequest = async (req, res) => {
+  try {
+    const { id } = req.params; // Target user ID
+    const { userId } = req.body; // Current user ID (who is canceling)
+
+    // Validate userId
+    if (!userId || typeof userId !== "string" || userId.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "User ID is required",
+        error: "Valid user ID must be provided to cancel a friend request",
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    // Read users
+    const users = await readJson("users.json");
+
+    // Find both users
+    const targetUserIndex = users.findIndex((u) => u.id === id);
+    const currentUserIndex = users.findIndex((u) => u.id === userId);
+
+    if (targetUserIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        message: "Target user not found",
+        error: "No user found with the provided target ID",
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    if (currentUserIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        message: "Current user not found",
+        error: "No user found with the provided current user ID",
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    const targetUser = users[targetUserIndex];
+    const currentUser = users[currentUserIndex];
+
+    // Initialize arrays if they don't exist
+    if (!targetUser.friendRequests) targetUser.friendRequests = [];
+    if (!currentUser.sentFriendRequests) currentUser.sentFriendRequests = [];
+
+    // Check if friend request exists
+    if (!currentUser.sentFriendRequests.includes(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "No friend request found to this user",
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    // Remove from friend requests and sent requests
+    targetUser.friendRequests = targetUser.friendRequests.filter(reqId => reqId !== userId);
+    currentUser.sentFriendRequests = currentUser.sentFriendRequests.filter(reqId => reqId !== id);
+
+    // Update timestamps
+    targetUser.updatedAt = new Date().toISOString();
+    currentUser.updatedAt = new Date().toISOString();
+
+    // Update users in array
+    users[targetUserIndex] = targetUser;
+    users[currentUserIndex] = currentUser;
+
+    // Save updated users
+    await writeJson("users.json", users);
+
+    console.log(`${currentUser.fullName} canceled friend request to ${targetUser.fullName}`);
+
+    res.status(200).json({
+      success: true,
+      message: "Friend request canceled successfully",
+      data: {
+        targetUserId: id,
+        currentUserId: userId,
+        requestCanceled: true,
+      },
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error("Cancel friend request error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error canceling friend request",
+      error:
+        process.env.NODE_ENV === "development"
+          ? error.message
+          : "Something went wrong",
+      timestamp: new Date().toISOString(),
+    });
+  }
+};
+
+/**
+ * Remove friendship with a user
+ * POST /users/:id/unfriend
+ */
+const removeFriendship = async (req, res) => {
+  try {
+    const { id } = req.params; // Friend user ID
+    const { userId } = req.body; // Current user ID
+
+    // Validate userId
+    if (!userId || typeof userId !== "string" || userId.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "User ID is required",
+        error: "Valid user ID must be provided to remove friendship",
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    // Prevent users from unfriending themselves
+    if (id === userId) {
+      return res.status(400).json({
+        success: false,
+        message: "Cannot unfriend yourself",
+        error: "Users cannot unfriend themselves",
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    // Read users
+    const users = await readJson("users.json");
+
+    // Find both users
+    const friendUserIndex = users.findIndex((u) => u.id === id);
+    const currentUserIndex = users.findIndex((u) => u.id === userId);
+
+    if (friendUserIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        message: "Friend user not found",
+        error: "No user found with the provided friend ID",
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    if (currentUserIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        message: "Current user not found",
+        error: "No user found with the provided current user ID",
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    const friendUser = users[friendUserIndex];
+    const currentUser = users[currentUserIndex];
+
+    // Initialize arrays if they don't exist
+    if (!currentUser.friends) currentUser.friends = [];
+    if (!friendUser.friends) friendUser.friends = [];
+
+    // Check if they are friends
+    if (!currentUser.friends.includes(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "You are not friends with this user",
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    // Remove from friends lists
+    currentUser.friends = currentUser.friends.filter(friendId => friendId !== id);
+    friendUser.friends = friendUser.friends.filter(friendId => friendId !== userId);
+
+    // Update friend counts
+    currentUser.friendsCount = currentUser.friends.length;
+    friendUser.friendsCount = friendUser.friends.length;
+
+    // Update timestamps
+    currentUser.updatedAt = new Date().toISOString();
+    friendUser.updatedAt = new Date().toISOString();
+
+    // Update users in array
+    users[currentUserIndex] = currentUser;
+    users[friendUserIndex] = friendUser;
+
+    // Save updated users
+    await writeJson("users.json", users);
+
+    console.log(`${currentUser.fullName} unfriended ${friendUser.fullName}`);
+
+    res.status(200).json({
+      success: true,
+      message: "Friendship removed successfully",
+      data: {
+        friendUserId: id,
+        currentUserId: userId,
+        areFriends: false,
+        friendsCount: currentUser.friendsCount,
+      },
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error("Remove friendship error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error removing friendship",
+      error:
+        process.env.NODE_ENV === "development"
+          ? error.message
+          : "Something went wrong",
+      timestamp: new Date().toISOString(),
+    });
+  }
+};
+
+/**
+ * Get friends for a user
+ * GET /users/:id/friends
+ */
+const getFriends = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { page = 1, limit = 20 } = req.query;
+
+    // Validate pagination parameters
+    const validatedParams = { page: parseInt(page) || 1, limit: Math.min(parseInt(limit) || 20, 50) };
+    
+    if (validatedParams.page < 1) validatedParams.page = 1;
+    if (validatedParams.limit < 1) validatedParams.limit = 20;
+
+    // Read users
+    const users = await readJson("users.json");
+
+    // Find the target user
+    const targetUser = users.find((u) => u.id === id);
+    if (!targetUser) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+        error: "No user found with the provided ID",
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    // Ensure friends array exists
+    const friends = targetUser.friends || [];
+
+    // Calculate pagination
+    const totalFriends = friends.length;
+    const totalPages = Math.ceil(totalFriends / validatedParams.limit);
+    const startIndex = (validatedParams.page - 1) * validatedParams.limit;
+    const endIndex = startIndex + validatedParams.limit;
+
+    // Get paginated friend IDs
+    const paginatedFriendIds = friends.slice(startIndex, endIndex);
+
+    // Create a user lookup map for better performance
+    const userMap = users.reduce((map, user) => {
+      map[user.id] = user;
+      return map;
+    }, {});
+
+    // Enrich friends with user information
+    const enrichedFriends = paginatedFriendIds.map((friendId) => {
+      const friend = userMap[friendId];
+      return {
+        id: friendId,
+        fullName: friend ? friend.fullName : "Unknown User",
+        email: friend ? friend.email : null,
+        friendsCount: friend ? (friend.friendsCount || 0) : 0,
+      };
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "User friends retrieved successfully",
+      data: {
+        userId: id,
+        userName: targetUser.fullName,
+        friendsCount: totalFriends,
+        friends: enrichedFriends,
+      },
+      pagination: {
+        page: validatedParams.page,
+        limit: validatedParams.limit,
+        totalFriends,
+        totalPages,
+        hasNextPage: validatedParams.page < totalPages,
+        hasPrevPage: validatedParams.page > 1,
+      },
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error("Get friends error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error retrieving friends",
+      error:
+        process.env.NODE_ENV === "development"
+          ? error.message
+          : "Something went wrong",
+      timestamp: new Date().toISOString(),
+    });
+  }
+};
+
+/**
+ * Get pending friend requests for a user
+ * GET /users/:id/friend-requests
+ */
+const getPendingRequests = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { page = 1, limit = 20, type = 'received' } = req.query;
+
+    // Validate pagination parameters
+    const validatedParams = { page: parseInt(page) || 1, limit: Math.min(parseInt(limit) || 20, 50) };
+    
+    if (validatedParams.page < 1) validatedParams.page = 1;
+    if (validatedParams.limit < 1) validatedParams.limit = 20;
+
+    // Validate type parameter
+    if (!['received', 'sent'].includes(type)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid type parameter. Must be 'received' or 'sent'",
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    // Read users
+    const users = await readJson("users.json");
+
+    // Find the target user
+    const targetUser = users.find((u) => u.id === id);
+    if (!targetUser) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+        error: "No user found with the provided ID",
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    // Get the appropriate requests array
+    const requests = type === 'received' 
+      ? (targetUser.friendRequests || [])
+      : (targetUser.sentFriendRequests || []);
+
+    // Calculate pagination
+    const totalRequests = requests.length;
+    const totalPages = Math.ceil(totalRequests / validatedParams.limit);
+    const startIndex = (validatedParams.page - 1) * validatedParams.limit;
+    const endIndex = startIndex + validatedParams.limit;
+
+    // Get paginated request IDs
+    const paginatedRequestIds = requests.slice(startIndex, endIndex);
+
+    // Create a user lookup map for better performance
+    const userMap = users.reduce((map, user) => {
+      map[user.id] = user;
+      return map;
+    }, {});
+
+    // Enrich requests with user information
+    const enrichedRequests = paginatedRequestIds.map((requestId) => {
+      const user = userMap[requestId];
+      return {
+        id: requestId,
+        fullName: user ? user.fullName : "Unknown User",
+        email: user ? user.email : null,
+        friendsCount: user ? (user.friendsCount || 0) : 0,
+      };
+    });
+
+    res.status(200).json({
+      success: true,
+      message: `${type === 'received' ? 'Received' : 'Sent'} friend requests retrieved successfully`,
+      data: {
+        userId: id,
+        userName: targetUser.fullName,
+        requestsCount: totalRequests,
+        requestType: type,
+        requests: enrichedRequests,
+      },
+      pagination: {
+        page: validatedParams.page,
+        limit: validatedParams.limit,
+        totalRequests,
+        totalPages,
+        hasNextPage: validatedParams.page < totalPages,
+        hasPrevPage: validatedParams.page > 1,
+      },
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error("Get pending requests error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error retrieving friend requests",
+      error:
+        process.env.NODE_ENV === "development"
+          ? error.message
+          : "Something went wrong",
+      timestamp: new Date().toISOString(),
+    });
+  }
+};
+
+/**
+ * Get friendship status between two users
+ * GET /users/:id/friendship-status
+ */
+const getFriendshipStatus = async (req, res) => {
+  try {
+    const { id } = req.params; // Target user ID
+    const { userId } = req.query; // Current user ID
+
+    // Validate userId query parameter
+    if (!userId || typeof userId !== "string" || userId.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Missing userId in query parameters",
+        error: "Valid user ID must be provided in query parameters",
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    // Validate ID format using the same validation as other endpoints
+    if (!/^[a-zA-Z0-9]+$/.test(id) || !/^[a-zA-Z0-9]+$/.test(userId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid user ID format",
+        error: "User IDs must contain only alphanumeric characters",
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    // Read users
+    const users = await readJson("users.json");
+
+    // Find both users
     const targetUser = users.find((u) => u.id === id);
     const currentUser = users.find((u) => u.id === userId);
 
@@ -646,35 +1099,51 @@ const getFollowStatus = async (req, res) => {
     if (!currentUser) {
       return res.status(404).json({
         success: false,
-        message: "Current user not found", 
+        message: "Current user not found",
         error: "No user found with the provided current user ID",
         timestamp: new Date().toISOString(),
       });
     }
 
-    // Check follow status
-    const isFollowing = targetUser.followers ? targetUser.followers.includes(userId) : false;
-    const isFollowedBy = currentUser.followers ? currentUser.followers.includes(id) : false;
+    // Initialize arrays if they don't exist
+    const currentUserFriends = currentUser.friends || [];
+    const currentUserSentRequests = currentUser.sentFriendRequests || [];
+    const currentUserReceivedRequests = currentUser.friendRequests || [];
+
+    // Determine friendship status
+    const areFriends = currentUserFriends.includes(id);
+    const requestSent = currentUserSentRequests.includes(id);
+    const requestReceived = currentUserReceivedRequests.includes(id);
+
+    let status = 'none';
+    if (areFriends) {
+      status = 'friends';
+    } else if (requestSent) {
+      status = 'request_sent';
+    } else if (requestReceived) {
+      status = 'request_received';
+    }
 
     res.status(200).json({
       success: true,
-      message: "Follow status retrieved successfully",
+      message: "Friendship status retrieved successfully",
       data: {
         targetUserId: id,
         targetUserName: targetUser.fullName,
         currentUserId: userId,
         currentUserName: currentUser.fullName,
-        isFollowing: isFollowing, // Current user follows target user
-        isFollowedBy: isFollowedBy, // Target user follows current user
-        mutualFollow: isFollowing && isFollowedBy,
+        status: status,
+        areFriends: areFriends,
+        requestSent: requestSent,
+        requestReceived: requestReceived,
       },
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    console.error("Get follow status error:", error);
+    console.error("Get friendship status error:", error);
     res.status(500).json({
       success: false,
-      message: "Internal server error retrieving follow status",
+      message: "Internal server error retrieving friendship status",
       error:
         process.env.NODE_ENV === "development"
           ? error.message
@@ -798,10 +1267,14 @@ module.exports = {
   getAllUsers,
   checkUserExists,
   getUserStats,
-  followUser,
-  getFollowers,
-  getFollowing,
-  getFollowStatus,
+  sendFriendRequest,
+  acceptFriendRequest,
+  rejectFriendRequest,
+  cancelFriendRequest,
+  removeFriendship,
+  getFriends,
+  getPendingRequests,
+  getFriendshipStatus,
   registerPushToken,
   updateUserProfile
 };

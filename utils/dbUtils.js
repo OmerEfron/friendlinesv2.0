@@ -33,10 +33,10 @@ const initializeDatabase = async () => {
           email TEXT UNIQUE NOT NULL,
           createdAt TEXT NOT NULL,
           updatedAt TEXT NOT NULL,
-          followers TEXT DEFAULT '[]',
-          following TEXT DEFAULT '[]',
-          followersCount INTEGER DEFAULT 0,
-          followingCount INTEGER DEFAULT 0
+          friends TEXT DEFAULT '[]',
+          friendRequests TEXT DEFAULT '[]',
+          sentFriendRequests TEXT DEFAULT '[]',
+          friendsCount INTEGER DEFAULT 0
         );
         
         -- Posts table
@@ -136,7 +136,7 @@ const rowToJson = (row, tableName) => {
   
   // Convert JSON string fields back to objects/arrays
   const jsonFields = {
-    users: ['followers', 'following'],
+    users: ['friends', 'friendRequests', 'sentFriendRequests'],
     posts: ['likes', 'comments', 'groupIds'],
     groups: ['members', 'invites', 'settings'],
     notifications: ['data']
@@ -174,7 +174,7 @@ const jsonToRow = (obj, tableName) => {
   
   // Convert arrays/objects to JSON strings
   const jsonFields = {
-    users: ['followers', 'following'],
+    users: ['friends', 'friendRequests', 'sentFriendRequests'],
     posts: ['likes', 'comments', 'groupIds'],
     groups: ['members', 'invites', 'settings'],
     notifications: ['data']

@@ -11,10 +11,14 @@ const {
   getAllUsers,
   checkUserExists,
   getUserStats,
-  followUser,
-  getFollowers,
-  getFollowing,
-  getFollowStatus,
+  sendFriendRequest,
+  acceptFriendRequest,
+  rejectFriendRequest,
+  cancelFriendRequest,
+  removeFriendship,
+  getFriends,
+  getPendingRequests,
+  getFriendshipStatus,
   registerPushToken,
   updateUserProfile,
 } = require("../controllers/authController");
@@ -101,49 +105,101 @@ router.get(
 );
 
 /**
- * POST /users/:id/follow
- * Follow or unfollow a user
+ * POST /users/:id/friend-request
+ * Send friend request to a user
  * Body: { userId }
  */
 router.post(
-  "/users/:id/follow",
+  "/users/:id/friend-request",
   validateIdMiddleware("id"), // Validate user ID parameter
   validateContentType, // Ensure JSON content type
   ensureBodyExists, // Ensure request body exists
-  followUser // Controller function
+  sendFriendRequest // Controller function
 );
 
 /**
- * GET /users/:id/followers
- * Get followers for a user
+ * POST /users/:id/accept-friend
+ * Accept friend request from a user
+ * Body: { userId }
+ */
+router.post(
+  "/users/:id/accept-friend",
+  validateIdMiddleware("id"), // Validate user ID parameter
+  validateContentType, // Ensure JSON content type
+  ensureBodyExists, // Ensure request body exists
+  acceptFriendRequest // Controller function
+);
+
+/**
+ * POST /users/:id/reject-friend
+ * Reject friend request from a user
+ * Body: { userId }
+ */
+router.post(
+  "/users/:id/reject-friend",
+  validateIdMiddleware("id"), // Validate user ID parameter
+  validateContentType, // Ensure JSON content type
+  ensureBodyExists, // Ensure request body exists
+  rejectFriendRequest // Controller function
+);
+
+/**
+ * POST /users/:id/cancel-friend-request
+ * Cancel sent friend request
+ * Body: { userId }
+ */
+router.post(
+  "/users/:id/cancel-friend-request",
+  validateIdMiddleware("id"), // Validate user ID parameter
+  validateContentType, // Ensure JSON content type
+  ensureBodyExists, // Ensure request body exists
+  cancelFriendRequest // Controller function
+);
+
+/**
+ * POST /users/:id/unfriend
+ * Remove friendship with a user
+ * Body: { userId }
+ */
+router.post(
+  "/users/:id/unfriend",
+  validateIdMiddleware("id"), // Validate user ID parameter
+  validateContentType, // Ensure JSON content type
+  ensureBodyExists, // Ensure request body exists
+  removeFriendship // Controller function
+);
+
+/**
+ * GET /users/:id/friends
+ * Get friends for a user
  * Query params: page, limit
  */
 router.get(
-  "/users/:id/followers",
+  "/users/:id/friends",
   validateIdMiddleware("id"), // Validate user ID parameter
-  getFollowers // Controller function
+  getFriends // Controller function
 );
 
 /**
- * GET /users/:id/following
- * Get following for a user
- * Query params: page, limit
+ * GET /users/:id/friend-requests
+ * Get pending friend requests for a user
+ * Query params: page, limit, type (received|sent)
  */
 router.get(
-  "/users/:id/following",
+  "/users/:id/friend-requests",
   validateIdMiddleware("id"), // Validate user ID parameter
-  getFollowing // Controller function
+  getPendingRequests // Controller function
 );
 
 /**
- * GET /users/:id/follow-status
- * Get follow status between two users
+ * GET /users/:id/friendship-status
+ * Get friendship status between two users
  * Query params: userId (current user ID)
  */
 router.get(
-  "/users/:id/follow-status",
+  "/users/:id/friendship-status",
   validateIdMiddleware("id"), // Validate user ID parameter
-  getFollowStatus // Controller function
+  getFriendshipStatus // Controller function
 );
 
 /**
