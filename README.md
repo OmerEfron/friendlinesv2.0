@@ -4,13 +4,22 @@ A satirical social news API that transforms everyday life updates into dramatic 
 
 ## Features
 
-- User authentication and management
-- Newsflash post creation with automatic generation
-- Group management and group-specific posts
-- Social features (likes, comments)
-- Push notifications via Expo
-- Rate limiting and validation
-- Comprehensive test coverage
+- **User Authentication**: Secure login/registration system
+- **Friendship System**: Bidirectional friend requests and management
+- **Newsflash Posts**: Automatic satirical news generation with GPT/deterministic options
+- **Audience Targeting**: Granular privacy controls (friends/groups/specific friend)
+- **Group Management**: Create, join, and manage groups with member notifications
+- **Social Features**: Likes, comments, and engagement tracking
+- **Push Notifications**: Real-time notifications via Expo
+- **Rate Limiting**: Comprehensive abuse prevention
+- **SQLite Database**: Reliable data persistence with automatic migration
+- **Comprehensive Testing**: 90%+ test coverage with Jest and Supertest
+
+👉 For the full API reference, see **[api_docs/README.md](api_docs/README.md)**.
+
+📋 For recent changes and version history, see **[docs/CHANGELOG.md](docs/CHANGELOG.md)**.
+
+📖 For comprehensive documentation navigation, see **[docs/README.md](docs/README.md)**.
 
 ## 🚀 Quick Start
 

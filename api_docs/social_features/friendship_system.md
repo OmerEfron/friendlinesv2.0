@@ -40,8 +40,9 @@ Send a friend request to a user.
 ```
 
 **Error Responses:**
-- `400`: Missing userId, invalid ID formats, cannot send request to yourself, request already sent, or user already a friend
+- `400`: Invalid request format
 - `404`: Target user not found or current user not found
+- `422`: Missing userId, invalid ID formats, cannot send request to yourself, request already sent, or user already a friend
 - `500`: Server error
 
 ---
@@ -75,8 +76,9 @@ Accept a friend request from a user.
 ```
 
 **Error Responses:**
-- `400`: Missing userId, invalid ID formats, or no friend request found
+- `400`: Invalid request format
 - `404`: Requester user not found or current user not found
+- `422`: Missing userId, invalid ID formats, or no friend request found
 - `500`: Server error
 
 ---
@@ -109,8 +111,9 @@ Reject a friend request from a user.
 ```
 
 **Error Responses:**
-- `400`: Missing userId, invalid ID formats, or no friend request found
+- `400`: Invalid request format
 - `404`: Requester user not found or current user not found
+- `422`: Missing userId, invalid ID formats, or no friend request found
 - `500`: Server error
 
 ---
@@ -143,8 +146,9 @@ Cancel a sent friend request.
 ```
 
 **Error Responses:**
-- `400`: Missing userId, invalid ID formats, or no friend request found
+- `400`: Invalid request format
 - `404`: Target user not found or current user not found
+- `422`: Missing userId, invalid ID formats, or no friend request found
 - `500`: Server error
 
 ---
@@ -178,8 +182,9 @@ Remove friendship with a user (unfriend).
 ```
 
 **Error Responses:**
-- `400`: Missing userId, invalid ID formats, cannot unfriend yourself, or not friends with user
+- `400`: Invalid request format
 - `404`: Friend user not found or current user not found
+- `422`: Missing userId, invalid ID formats, cannot unfriend yourself, or not friends with user
 - `500`: Server error
 
 ---

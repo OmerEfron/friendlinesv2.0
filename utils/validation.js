@@ -134,7 +134,7 @@ const validatePostData = (postData) => {
     return { isValid: false, errors };
   }
 
-  const { rawText, userId, groupIds } = postData;
+  const { rawText, userId, audienceType, targetFriendId, groupIds } = postData;
 
   // Validate user ID
   if (!userId || typeof userId !== "string" || userId.trim().length === 0) {
@@ -147,11 +147,44 @@ const validatePostData = (postData) => {
     errors.push(...textValidation.errors);
   }
 
-  // Validate group IDs (optional)
-  if (groupIds !== undefined) {
-    if (!Array.isArray(groupIds)) {
-      errors.push("Group IDs must be an array");
-    } else if (groupIds.length > 5) {
+  // Validate audience type (optional for backward compatibility)
+  const validAudienceTypes = ["friends", "groups", "friend"];
+  if (audienceType && typeof audienceType === "string" && !validAudienceTypes.includes(audienceType)) {
+    errors.push("Audience type must be one of: friends, groups, friend");
+  }
+
+  // Validate based on audience type if provided
+  if (audienceType === "friend") {
+    // For friend posts, targetFriendId is required
+    if (!targetFriendId || typeof targetFriendId !== "string" || targetFriendId.trim().length === 0) {
+      errors.push("Target friend ID is required for friend posts");
+    }
+    // groupIds should not be provided for friend posts
+    if (groupIds && groupIds.length > 0) {
+      errors.push("Group IDs should not be provided for friend posts");
+    }
+  } else if (audienceType === "groups") {
+    // For group posts, groupIds are required
+    if (!groupIds || !Array.isArray(groupIds) || groupIds.length === 0) {
+      errors.push("At least one group ID is required for group posts");
+    }
+    // targetFriendId should not be provided for group posts
+    if (targetFriendId) {
+      errors.push("Target friend ID should not be provided for group posts");
+    }
+  } else if (audienceType === "friends") {
+    // For friends posts, neither groupIds nor targetFriendId should be provided
+    if (groupIds && groupIds.length > 0) {
+      errors.push("Group IDs should not be provided for friends posts");
+    }
+    if (targetFriendId) {
+      errors.push("Target friend ID should not be provided for friends posts");
+    }
+  }
+
+  // Validate group IDs if provided (backward compatibility)
+  if (groupIds !== undefined && Array.isArray(groupIds)) {
+    if (groupIds.length > 5) {
       errors.push("Cannot post to more than 5 groups at once");
     } else {
       // Validate each group ID
@@ -176,6 +209,8 @@ const validatePostData = (postData) => {
     sanitizedData: {
       rawText: rawText ? rawText.trim() : "",
       userId: userId ? userId.trim() : "",
+      audienceType: audienceType ? audienceType.trim() : undefined,
+      targetFriendId: targetFriendId ? targetFriendId.trim() : undefined,
       groupIds: groupIds ? groupIds.map(id => id.trim()).filter(Boolean) : [],
     },
   };

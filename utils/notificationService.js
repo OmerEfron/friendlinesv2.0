@@ -235,6 +235,61 @@ const getGroupMembersTokens = async (groupIds, excludeUserId) => {
 };
 
 /**
+ * Get friends' push tokens for a user
+ * @param {string} userId - The user ID whose friends we want to notify
+ * @returns {Promise<string[]>} - Array of valid push tokens
+ */
+const getFriendsTokens = async (userId) => {
+  try {
+    const users = await readJson('users.json');
+    
+    // Find the user
+    const user = users.find(u => u.id === userId);
+    if (!user || !user.friends) {
+      return [];
+    }
+
+    // Get tokens for all friends
+    const friendTokens = users
+      .filter(u => user.friends.includes(u.id) && u.expoPushToken)
+      .map(u => u.expoPushToken)
+      .filter(token => isValidExpoPushToken(token));
+
+    return friendTokens;
+  } catch (error) {
+    console.error('Error getting friends tokens:', error);
+    return [];
+  }
+};
+
+/**
+ * Get push tokens for a specific friend
+ * @param {string} friendId - The friend's user ID to notify
+ * @returns {Promise<string[]>} - Array containing the friend's push token (if valid)
+ */
+const getFriendTokens = async (friendId) => {
+  try {
+    const users = await readJson('users.json');
+    
+    // Find the friend
+    const friend = users.find(u => u.id === friendId);
+    if (!friend || !friend.expoPushToken) {
+      return [];
+    }
+
+    // Return token if valid
+    if (isValidExpoPushToken(friend.expoPushToken)) {
+      return [friend.expoPushToken];
+    }
+
+    return [];
+  } catch (error) {
+    console.error('Error getting friend token:', error);
+    return [];
+  }
+};
+
+/**
  * Remove invalid tokens from user records
  * @param {string[]} invalidTokens - Array of invalid tokens to remove
  */
@@ -267,6 +322,8 @@ module.exports = {
   sendPush,
   getFollowersTokens,
   getGroupMembersTokens,
+  getFriendsTokens,
+  getFriendTokens,
   removeInvalidTokens,
   isValidExpoPushToken
 }; 

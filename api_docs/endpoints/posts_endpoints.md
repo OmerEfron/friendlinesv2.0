@@ -1,13 +1,16 @@
 ## Posts Endpoints
 
 ### GET /api/posts
-Get all posts (newsflashes) with pagination.
+Get all posts (newsflashes) with pagination and audience filtering.
 
 **Query Parameters:**
 - `page`: Page number (default: 1, min: 1)
 - `limit`: Items per page (default: 20, max: 100)
+- `currentUserId`: (Optional) Current user ID for audience filtering
 
-**Example:** `GET /api/posts?page=1&limit=10`
+**Example:** `GET /api/posts?page=1&limit=10&currentUserId=u123456789`
+
+**Note:** If `currentUserId` is provided, posts will be filtered based on audience targeting and friendship relationships. Without it, only public posts (for backward compatibility) will be shown.
 
 **Response:**
 ```json
@@ -24,6 +27,10 @@ Get all posts (newsflashes) with pagination.
       "timestamp": "2025-06-14T18:00:00.000Z",
       "createdAt": "2025-06-14T18:00:00.000Z",
       "updatedAt": "2025-06-14T18:00:00.000Z",
+      "audienceType": "friends",
+      "targetFriendId": null,
+      "groupIds": [],
+      "visibility": "friends_only",
       "likesCount": 0,
       "commentsCount": 0,
       "sharesCount": 0
@@ -44,7 +51,7 @@ Get all posts (newsflashes) with pagination.
 ---
 
 ### GET /api/posts/:userId
-Get posts by a specific user with pagination.
+Get posts by a specific user with pagination and audience filtering.
 
 **Parameters:**
 - `userId`: User ID (required)
@@ -52,6 +59,9 @@ Get posts by a specific user with pagination.
 **Query Parameters:**
 - `page`: Page number (default: 1)
 - `limit`: Items per page (default: 20, max: 100)
+- `currentUserId`: (Optional) Current user ID for audience filtering
+
+**Note:** Posts will be filtered based on audience targeting. Users can only see posts they're authorized to view.
 
 **Response:**
 ```json
@@ -68,6 +78,10 @@ Get posts by a specific user with pagination.
       "timestamp": "2025-06-14T18:00:00.000Z",
       "createdAt": "2025-06-14T18:00:00.000Z",
       "updatedAt": "2025-06-14T18:00:00.000Z",
+      "audienceType": "friends",
+      "targetFriendId": null,
+      "groupIds": [],
+      "visibility": "friends_only",
       "likesCount": 0,
       "commentsCount": 0,
       "sharesCount": 0
@@ -93,19 +107,22 @@ Get posts by a specific user with pagination.
 **Error Responses:**
 - `400`: Invalid user ID format
 - `404`: User not found
+- `422`: Unprocessable Entity (validation errors)
 - `500`: Server error
 
 ---
 
 ### POST /api/posts
-Create a new post with automatic newsflash generation.
+Create a new post with automatic newsflash generation and audience targeting.
 
 **Request Body:**
 ```json
 {
   "rawText": "I just got a new dog! 🐶",
   "userId": "u123456789",
-  "groupIds": ["g123456789", "g987654321"],
+  "audienceType": "friends",
+  "targetFriendId": null,
+  "groupIds": [],
   "tone": "satirical",
   "length": "short",
   "temperature": 0.7
@@ -115,10 +132,28 @@ Create a new post with automatic newsflash generation.
 **Validation Rules:**
 - `rawText`: Required, 1-280 characters, no HTML/script tags
 - `userId`: Required, valid user ID format
-- `groupIds`: Optional array, max 5 group IDs, no duplicates
+- `audienceType`: Required, one of: "friends", "groups", "friend"
+- `targetFriendId`: Required if audienceType is "friend", must be a valid friend
+- `groupIds`: Required if audienceType is "groups", max 5 group IDs, no duplicates
 - `tone`: Optional, newsflash tone (e.g., "satirical", "serious", "humorous", "sarcastic")
 - `length`: Optional, "short" or "long" (affects GPT generation)
 - `temperature`: Optional, 0-2 (GPT creativity level, default: 0.7)
+
+**Audience Types:**
+1. **"friends"**: Post visible to all user's friends
+   - `targetFriendId` and `groupIds` should not be provided
+   - Sets visibility to "friends_only"
+
+2. **"friend"**: Post visible to a specific friend only
+   - `targetFriendId` is required and must be an actual friend
+   - `groupIds` should not be provided
+   - Sets visibility to "friend_only"
+
+3. **"groups"**: Post visible to members of specified groups
+   - `groupIds` array is required with at least one group
+   - User must be a member of all specified groups
+   - `targetFriendId` should not be provided
+   - Sets visibility to "groups_only"
 
 **Response (201):**
 ```json
@@ -134,6 +169,10 @@ Create a new post with automatic newsflash generation.
     "timestamp": "2025-06-14T18:00:00.000Z",
     "createdAt": "2025-06-14T18:00:00.000Z",
     "updatedAt": "2025-06-14T18:00:00.000Z",
+    "audienceType": "friends",
+    "targetFriendId": null,
+    "groupIds": [],
+    "visibility": "friends_only",
     "likesCount": 0,
     "commentsCount": 0,
     "sharesCount": 0
@@ -149,15 +188,16 @@ Create a new post with automatic newsflash generation.
 - GPT generation supports configurable tone, length, and temperature
 - Deterministic generation uses rule-based text transformation
 
-**Additional Group Features:**
-- If `groupIds` are provided, post visibility is set to "groups_only"
-- Group posts notify group members instead of followers
-- User must be a member of all specified groups
+**Push Notifications:**
+- **Friends posts**: Notify all user's friends
+- **Friend posts**: Notify the specific target friend
+- **Group posts**: Notify all group members (excluding author)
 
 **Error Responses:**
 - `400`: Validation failed or newsflash generation failed
-- `403`: Access denied to one or more groups (user not a member)
-- `404`: User not found
+- `403`: Access denied (not friends with target, or not member of groups)
+- `404`: User not found or target friend not found
+- `422`: Unprocessable Entity (semantic validation errors)
 - `429`: Too many posts created (rate limited)
 - `500`: Server error
 
@@ -212,8 +252,9 @@ Generate a newsflash preview using GPT (without creating a post).
 - `"deterministic"`: Generated using rule-based transformation (fallback)
 
 **Error Responses:**
-- `400`: Validation failed or newsflash generation failed
+- `400`: Invalid request format
 - `404`: User not found
+- `422`: Validation failed or newsflash generation failed
 - `500`: Server error
 
 ---
@@ -292,8 +333,9 @@ Update an existing post (regenerates newsflash).
 ```
 
 **Error Responses:**
-- `400`: Invalid post ID format or validation failed
+- `400`: Invalid post ID format
 - `404`: Post not found or post owner not found
+- `422`: Validation failed
 - `429`: Too many post updates (rate limited)
 - `500`: Server error
 

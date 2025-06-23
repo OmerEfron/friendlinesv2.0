@@ -34,7 +34,8 @@ Create a new user or log in an existing user.
 ```
 
 **Error Responses:**
-- `400`: Validation failed
+- `400`: Invalid request format
+- `422`: Validation failed
 - `429`: Too many login attempts (rate limited)
 - `500`: Server error
 
@@ -146,8 +147,9 @@ Update user profile information.
 - 5 requests per hour per IP
 
 **Error Responses:**
-- `400`: Invalid user ID format or validation failed
+- `400`: Invalid user ID format
 - `404`: User not found
+- `422`: Validation failed
 - `429`: Too many profile updates (rate limited)
 - `500`: Server error
 

@@ -4,7 +4,7 @@
 const { readJson, writeJson } = require("../utils/dbUtils");
 const { generateId, validatePaginationParams } = require("../utils/validation");
 const { generateNewsflash, generateNewsflashGPT } = require("../utils/newsflashGenerator");
-const { sendPush, getFollowersTokens, getGroupMembersTokens } = require("../utils/notificationService");
+const { sendPush, getFollowersTokens, getGroupMembersTokens, getFriendsTokens, getFriendTokens } = require("../utils/notificationService");
 const { validateGroupAccess } = require("./groupController");
 
 /**
@@ -15,10 +15,18 @@ const getAllPosts = async (req, res) => {
   try {
     // Validate pagination parameters
     const { page, limit } = validatePaginationParams(req.query);
+    const currentUserId = req.body.currentUserId || req.query.currentUserId; // For authenticated requests
 
     // Read posts and users
     const posts = await readJson("posts.json");
     const users = await readJson("users.json");
+    const groups = await readJson("groups.json");
+
+    // Find current user if provided
+    let currentUser = null;
+    if (currentUserId) {
+      currentUser = users.find((u) => u.id === currentUserId);
+    }
 
     // Create a user lookup map for better performance
     const userMap = users.reduce((map, user) => {
@@ -26,8 +34,53 @@ const getAllPosts = async (req, res) => {
       return map;
     }, {});
 
+    // Create a group lookup map
+    const groupMap = groups.reduce((map, group) => {
+      map[group.id] = group;
+      return map;
+    }, {});
+
+    // Filter posts based on audience targeting and user relationships
+    const filteredPosts = posts.filter((post) => {
+      const postAuthor = userMap[post.userId];
+      if (!postAuthor) return false;
+
+      // If no current user, only show public posts (backward compatibility)
+      if (!currentUser) {
+        return post.visibility === "public" || !post.audienceType;
+      }
+
+      // Post author can always see their own posts
+      if (post.userId === currentUserId) {
+        return true;
+      }
+
+      // Filter based on audience type
+      switch (post.audienceType) {
+        case "friends":
+          // Only show to friends
+          return currentUser.friends && currentUser.friends.includes(post.userId);
+
+        case "friend":
+          // Only show to the specific target friend
+          return post.targetFriendId === currentUserId;
+
+        case "groups":
+          // Only show to group members
+          if (!post.groupIds || post.groupIds.length === 0) return false;
+          return post.groupIds.some(groupId => {
+            const group = groupMap[groupId];
+            return group && group.members && group.members.includes(currentUserId);
+          });
+
+        default:
+          // For backward compatibility, show public posts or posts without audience type
+          return post.visibility === "public" || !post.audienceType;
+      }
+    });
+
     // Sort posts by timestamp (newest first)
-    const sortedPosts = posts.sort(
+    const sortedPosts = filteredPosts.sort(
       (a, b) => new Date(b.timestamp) - new Date(a.timestamp)
     );
 
@@ -52,6 +105,9 @@ const getAllPosts = async (req, res) => {
         timestamp: post.timestamp,
         createdAt: post.createdAt,
         updatedAt: post.updatedAt,
+        // Audience targeting (only show to authorized users)
+        audienceType: post.audienceType || "public",
+        targetFriendId: post.targetFriendId || null,
         // Group features
         groupIds: post.groupIds || [],
         visibility: post.visibility || "public",
@@ -98,12 +154,14 @@ const getPostsByUser = async (req, res) => {
   try {
     const { userId } = req.params;
     const { page, limit } = validatePaginationParams(req.query);
+    const currentUserId = req.body.currentUserId || req.query.currentUserId; // For authenticated requests
 
     // Read posts and users
     const posts = await readJson("posts.json");
     const users = await readJson("users.json");
+    const groups = await readJson("groups.json");
 
-    // Find the user
+    // Find the target user
     const user = users.find((u) => u.id === userId);
     if (!user) {
       return res.status(404).json({
@@ -114,19 +172,68 @@ const getPostsByUser = async (req, res) => {
       });
     }
 
-    // Filter posts by user and sort by timestamp (newest first)
-    const userPosts = posts
-      .filter((post) => post.userId === userId)
-      .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    // Find current user if provided
+    let currentUser = null;
+    if (currentUserId) {
+      currentUser = users.find((u) => u.id === currentUserId);
+    }
+
+    // Create a group lookup map
+    const groupMap = groups.reduce((map, group) => {
+      map[group.id] = group;
+      return map;
+    }, {});
+
+    // Filter posts by user and apply audience targeting
+    const userPosts = posts.filter((post) => {
+      // Must be authored by the target user
+      if (post.userId !== userId) return false;
+
+      // If no current user, only show public posts (backward compatibility)
+      if (!currentUser) {
+        return post.visibility === "public" || !post.audienceType;
+      }
+
+      // Post author can always see their own posts
+      if (post.userId === currentUserId) {
+        return true;
+      }
+
+      // Filter based on audience type
+      switch (post.audienceType) {
+        case "friends":
+          // Only show to friends
+          return currentUser.friends && currentUser.friends.includes(post.userId);
+
+        case "friend":
+          // Only show to the specific target friend
+          return post.targetFriendId === currentUserId;
+
+        case "groups":
+          // Only show to group members
+          if (!post.groupIds || post.groupIds.length === 0) return false;
+          return post.groupIds.some(groupId => {
+            const group = groupMap[groupId];
+            return group && group.members && group.members.includes(currentUserId);
+          });
+
+        default:
+          // For backward compatibility, show public posts or posts without audience type
+          return post.visibility === "public" || !post.audienceType;
+      }
+    });
+
+    // Sort by timestamp (newest first)
+    const sortedPosts = userPosts.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
     // Calculate pagination
-    const totalPosts = userPosts.length;
+    const totalPosts = sortedPosts.length;
     const totalPages = Math.ceil(totalPosts / limit);
     const startIndex = (page - 1) * limit;
     const endIndex = startIndex + limit;
 
     // Get paginated posts
-    const paginatedPosts = userPosts.slice(startIndex, endIndex);
+    const paginatedPosts = sortedPosts.slice(startIndex, endIndex);
 
     // Enrich posts with user information
     const enrichedPosts = paginatedPosts.map((post) => ({
@@ -138,6 +245,9 @@ const getPostsByUser = async (req, res) => {
       timestamp: post.timestamp,
       createdAt: post.createdAt,
       updatedAt: post.updatedAt,
+      // Audience targeting (only show to authorized users)
+      audienceType: post.audienceType || "public",
+      targetFriendId: post.targetFriendId || null,
       // Group features
       groupIds: post.groupIds || [],
       visibility: post.visibility || "public",
@@ -187,7 +297,7 @@ const getPostsByUser = async (req, res) => {
 const createPost = async (req, res) => {
   try {
     // Get validated data from middleware
-    const { rawText, userId, groupIds } = req.validatedData;
+    const { rawText, userId, audienceType, targetFriendId, groupIds } = req.validatedData;
 
     // Read users and posts
     const users = await readJson("users.json");
@@ -204,16 +314,50 @@ const createPost = async (req, res) => {
       });
     }
 
-    // Validate group access if groupIds are provided
-    if (groupIds && groupIds.length > 0) {
-      const hasAccess = await validateGroupAccess(userId, groupIds);
-      if (!hasAccess) {
+    // Determine audience type - default to "groups" if groupIds provided, otherwise "public"
+    let finalAudienceType = audienceType;
+    if (!finalAudienceType) {
+      if (groupIds && groupIds.length > 0) {
+        finalAudienceType = "groups";
+      } else {
+        finalAudienceType = "public";
+      }
+    }
+
+    // Validate audience-specific requirements
+    if (finalAudienceType === "friend") {
+      // Check if targetFriendId is actually a friend
+      if (!user.friends || !user.friends.includes(targetFriendId)) {
         return res.status(403).json({
           success: false,
-          message: "Access denied to one or more groups",
-          error: "You must be a member of all specified groups",
+          message: "Access denied",
+          error: "You can only post to users who are your friends",
           timestamp: new Date().toISOString(),
         });
+      }
+
+      // Check if target friend exists
+      const targetFriend = users.find((u) => u.id === targetFriendId);
+      if (!targetFriend) {
+        return res.status(404).json({
+          success: false,
+          message: "Target friend not found",
+          error: "The specified friend does not exist",
+          timestamp: new Date().toISOString(),
+        });
+      }
+    } else if (finalAudienceType === "groups") {
+      // Validate group access if groupIds are provided
+      if (groupIds && groupIds.length > 0) {
+        const hasAccess = await validateGroupAccess(userId, groupIds);
+        if (!hasAccess) {
+          return res.status(403).json({
+            success: false,
+            message: "Access denied to one or more groups",
+            error: "You must be a member of all specified groups",
+            timestamp: new Date().toISOString(),
+          });
+        }
       }
     }
 
@@ -251,6 +395,22 @@ const createPost = async (req, res) => {
       });
     }
 
+    // Determine visibility based on audience type
+    let visibility;
+    switch (finalAudienceType) {
+      case "friends":
+        visibility = "friends_only";
+        break;
+      case "friend":
+        visibility = "friend_only";
+        break;
+      case "groups":
+        visibility = "groups_only";
+        break;
+      default:
+        visibility = "public";
+    }
+
     // Create new post
     const newPost = {
       id: generateId("p"),
@@ -260,9 +420,12 @@ const createPost = async (req, res) => {
       timestamp: new Date().toISOString(),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
+      // Audience targeting
+      audienceType: finalAudienceType,
+      targetFriendId: targetFriendId || null,
       // Group features
       groupIds: groupIds || [],
-      visibility: groupIds && groupIds.length > 0 ? "groups_only" : "public",
+      visibility,
       // Social features
       likes: [], // Array of user IDs who liked this post
       comments: [], // Array of comment objects
@@ -281,7 +444,7 @@ const createPost = async (req, res) => {
     try {
       let recipientTokens = [];
       
-      if (groupIds && groupIds.length > 0) {
+      if (finalAudienceType === "groups" && groupIds && groupIds.length > 0) {
         // Group post - notify group members
         recipientTokens = await getGroupMembersTokens(groupIds, userId);
         if (recipientTokens.length > 0) {
@@ -304,16 +467,16 @@ const createPost = async (req, res) => {
             console.error("Failed to send group push notifications:", notificationResult.error);
           }
         }
-      } else {
-        // Public post - notify followers
-        recipientTokens = await getFollowersTokens(userId);
+      } else if (finalAudienceType === "friends") {
+        // Friends post - notify all friends
+        recipientTokens = await getFriendsTokens(userId);
         if (recipientTokens.length > 0) {
           const notificationResult = await sendPush(
             recipientTokens,
-            "New Newsflash!",
+            "New Friends Newsflash!",
             `${user.fullName}: ${generatedText.substring(0, 100)}${generatedText.length > 100 ? '...' : ''}`,
             {
-              type: "new_post",
+              type: "friends_post",
               postId: newPost.id,
               userId: userId,
               userFullName: user.fullName
@@ -321,9 +484,32 @@ const createPost = async (req, res) => {
           );
           
           if (notificationResult.success) {
-            console.log(`Push notifications sent to ${recipientTokens.length} followers for post ${newPost.id}`);
+            console.log(`Push notifications sent to ${recipientTokens.length} friends for post ${newPost.id}`);
           } else {
-            console.error("Failed to send push notifications:", notificationResult.error);
+            console.error("Failed to send friends push notifications:", notificationResult.error);
+          }
+        }
+      } else if (finalAudienceType === "friend") {
+        // Single friend post - notify specific friend
+        recipientTokens = await getFriendTokens(targetFriendId);
+        if (recipientTokens.length > 0) {
+          const notificationResult = await sendPush(
+            recipientTokens,
+            "Personal Newsflash!",
+            `${user.fullName}: ${generatedText.substring(0, 100)}${generatedText.length > 100 ? '...' : ''}`,
+            {
+              type: "friend_post",
+              postId: newPost.id,
+              userId: userId,
+              userFullName: user.fullName,
+              targetFriendId: targetFriendId
+            }
+          );
+          
+          if (notificationResult.success) {
+            console.log(`Push notification sent to friend ${targetFriendId} for post ${newPost.id}`);
+          } else {
+            console.error("Failed to send friend push notification:", notificationResult.error);
           }
         }
       }
@@ -342,6 +528,9 @@ const createPost = async (req, res) => {
       timestamp: newPost.timestamp,
       createdAt: newPost.createdAt,
       updatedAt: newPost.updatedAt,
+      // Audience targeting
+      audienceType: newPost.audienceType,
+      targetFriendId: newPost.targetFriendId,
       // Group features
       groupIds: newPost.groupIds,
       visibility: newPost.visibility,
@@ -351,7 +540,7 @@ const createPost = async (req, res) => {
       sharesCount: newPost.sharesCount,
     };
 
-    console.log(`New post created by ${user.fullName}: ${newPost.id}`);
+    console.log(`New ${finalAudienceType} post created by ${user.fullName}: ${newPost.id}`);
 
     res.status(201).json({
       success: true,

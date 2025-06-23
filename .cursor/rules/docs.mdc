@@ -1,6 +1,6 @@
 ---
-description:
-globs:
+description: 
+globs: 
 alwaysApply: false
 ---
 # Friendlines – Documentation Rule
@@ -32,8 +32,6 @@ Trigger this rule **when**:
 ## Style Guide
 • Use **present tense**, active voice.<br/>• Headers: `##` for top-level, `###` for endpoint methods.<br/>• Include **Request**, **Response**, **Error Responses** sections.<br/>• All JSON blocks must be **pretty-printed** with 2-space indent.<br/>• Provide example `curl` commands.
 
-## Tools
-A helper script `backend/split_api_docs.js` splits unified docs; rerun after big changes.
 
 ## Verification
 CI step `docs-check` ensures no broken links or missing endpoint references. Fix failures before merging.

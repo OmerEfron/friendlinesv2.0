@@ -42,8 +42,9 @@ Create a new group.
 ```
 
 **Error Responses:**
-- `400`: Validation failed (invalid name or description)
+- `400`: Invalid request format
 - `404`: User not found
+- `422`: Validation failed (invalid name or description)
 - `429`: Too many requests (rate limited)
 - `500`: Server error
 
@@ -82,9 +83,10 @@ Invite users to a group.
 ```
 
 **Error Responses:**
-- `400`: Validation failed (invalid user IDs or too many invites)
+- `400`: Invalid request format
 - `403`: Access denied (not a group member)
 - `404`: Group not found or invited user not found
+- `422`: Validation failed (invalid user IDs or too many invites)
 - `500`: Server error
 
 ---
@@ -117,9 +119,10 @@ Accept a group invitation.
 ```
 
 **Error Responses:**
-- `400`: Validation failed (missing userId)
+- `400`: Invalid request format
 - `403`: No invitation found
 - `404`: Group not found
+- `422`: Validation failed (missing userId)
 - `500`: Server error
 
 ---
@@ -156,9 +159,10 @@ Leave a group.
 - If owner leaves and is the last member, the group is deleted
 
 **Error Responses:**
-- `400`: Validation failed (missing userId)
+- `400`: Invalid request format
 - `403`: Not a member or owner cannot leave without transferring ownership
 - `404`: Group not found
+- `422`: Validation failed (missing userId)
 - `500`: Server error
 
 ---
