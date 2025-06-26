@@ -108,11 +108,21 @@ jobs:
     - name: 📦 Checkout code
       uses: actions/checkout@v4
       
-    - name: 🚂 Deploy to Railway
-      uses: bltavares/actions-railway@v1
+    - name: 🚀 Setup Node.js
+      uses: actions/setup-node@v4
       with:
-        railway_token: ${{ secrets.RAILWAY_TOKEN }}
-        service: ${{ secrets.RAILWAY_SERVICE }}
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        
+    - name: 🚂 Install Railway CLI
+      run: npm install -g @railway/cli
+      
+    - name: 🚂 Deploy to Railway
+      run: |
+        railway link --service=${{ secrets.RAILWAY_SERVICE_ID }} --project-id=${{ secrets.RAILWAY_PROJECT_ID }} --environment=${{ secrets.RAILWAY_ENVIRONMENT_ID }}
+        railway redeploy --yes
+      env:
+        RAILWAY_API_TOKEN: ${{ secrets.RAILWAY_API_TOKEN }}
         
     - name: 🏥 Health Check
       run: |
