@@ -119,7 +119,7 @@ jobs:
       
     - name: 🚂 Deploy to Railway
       run: |
-        railway link --service=${{ secrets.RAILWAY_SERVICE_ID }} --project-id=${{ secrets.RAILWAY_PROJECT_ID }} --environment=${{ secrets.RAILWAY_ENVIRONMENT_ID }}
+        railway link --service=${{ secrets.RAILWAY_SERVICE_ID }} --project_id=${{ secrets.RAILWAY_PROJECT_ID }} --environment=${{ secrets.RAILWAY_ENVIRONMENT_ID }}
         railway redeploy --yes
       env:
         RAILWAY_API_TOKEN: ${{ secrets.RAILWAY_API_TOKEN }}
