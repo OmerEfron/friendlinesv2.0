@@ -2,7 +2,7 @@
 // Contains device registration and notification sending functionality
 
 const { Expo } = require('expo-server-sdk');
-const { readJson, writeJson } = require('./fileUtils');
+const { readJson, writeJson } = require('./dbUtils');
 
 // Create Expo SDK instance
 const expo = new Expo();
@@ -169,64 +169,25 @@ const handlePushErrors = async (results) => {
 };
 
 /**
- * Get followers' push tokens for a user
- * @param {string} userId - The user ID whose followers we want to notify
- * @returns {Promise<string[]>} - Array of valid push tokens
+ * Get group members' push tokens for a group
+ * @param {string} groupId - The group ID whose members we want to notify
+ * @returns {Promise<string[]>} Array of push tokens
  */
-const getFollowersTokens = async (userId) => {
+const getGroupMembersTokens = async (groupId) => {
   try {
-    const users = await readJson('users.json');
+    const groups = await readJson('groups');
+    const users = await readJson('users');
     
-    // Find the user
-    const user = users.find(u => u.id === userId);
-    if (!user || !user.followers) {
+    const group = groups.find(g => g.id === groupId);
+    if (!group || !group.members) {
       return [];
     }
-
-    // Get tokens for all followers
-    const followerTokens = users
-      .filter(u => user.followers.includes(u.id) && u.expoPushToken)
-      .map(u => u.expoPushToken)
-      .filter(token => isValidExpoPushToken(token));
-
-    return followerTokens;
-  } catch (error) {
-    console.error('Error getting followers tokens:', error);
-    return [];
-  }
-};
-
-/**
- * Get group members' push tokens for multiple groups
- * @param {string[]} groupIds - Array of group IDs to notify
- * @param {string} excludeUserId - User ID to exclude from notifications (usually the post creator)
- * @returns {Promise<string[]>} - Array of valid push tokens
- */
-const getGroupMembersTokens = async (groupIds, excludeUserId) => {
-  try {
-    const users = await readJson('users.json');
-    const groups = await readJson('groups.json');
     
-    // Get all unique member IDs from the specified groups
-    const memberIds = new Set();
-    
-    for (const groupId of groupIds) {
-      const group = groups.find(g => g.id === groupId);
-      if (group && group.members) {
-        group.members.forEach(memberId => {
-          if (memberId !== excludeUserId) { // Don't notify the post creator
-            memberIds.add(memberId);
-          }
-        });
-      }
-    }
-
     // Get tokens for all group members
     const memberTokens = users
-      .filter(u => memberIds.has(u.id) && u.expoPushToken)
-      .map(u => u.expoPushToken)
-      .filter(token => isValidExpoPushToken(token));
-
+      .filter(u => group.members.includes(u.id) && u.expoPushToken)
+      .map(u => u.expoPushToken);
+    
     return memberTokens;
   } catch (error) {
     console.error('Error getting group members tokens:', error);
@@ -320,9 +281,8 @@ const removeInvalidTokens = async (invalidTokens) => {
 module.exports = {
   registerDevice,
   sendPush,
-  getFollowersTokens,
-  getGroupMembersTokens,
   getFriendsTokens,
+  getGroupMembersTokens,
   getFriendTokens,
   removeInvalidTokens,
   isValidExpoPushToken

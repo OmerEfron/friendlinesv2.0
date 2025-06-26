@@ -1,9 +1,9 @@
 // Authentication controller for Friendlines
 // Contains business logic for user authentication
 
-const { readJson, writeJson } = require("../utils/dbUtils");
-const { generateId, isValidId, validateProfileUpdateData } = require("../utils/validation");
-const { registerDevice } = require("../utils/notificationService");
+const { readJson, writeJson, generateId } = require("../utils/dbUtils");
+const { isValidId, validateProfileUpdateData, validatePaginationParams } = require("../utils/validation");
+const { registerDevice, sendPush, getFriendTokens } = require("../utils/notificationService");
 
 /**
  * Handle user login (create or retrieve user)
@@ -401,6 +401,33 @@ const sendFriendRequest = async (req, res) => {
     // Save updated users
     await writeJson("users.json", users);
 
+    // Send push notification to target user (non-blocking)
+    try {
+      if (targetUser.expoPushToken) {
+        const notificationResult = await sendPush(
+          [targetUser.expoPushToken],
+          "New Friend Request!",
+          `${currentUser.fullName} sent you a friend request`,
+          {
+            type: "friend_request",
+            requesterId: userId,
+            requesterName: currentUser.fullName,
+            targetUserId: id,
+            targetUserName: targetUser.fullName
+          }
+        );
+        
+        if (notificationResult.success) {
+          console.log(`Friend request notification sent to ${targetUser.fullName} from ${currentUser.fullName}`);
+        } else {
+          console.error(`Failed to send friend request notification to ${targetUser.fullName}:`, notificationResult.error);
+        }
+      }
+    } catch (notificationError) {
+      // Don't fail the friend request if notifications fail
+      console.error("Friend request notification error:", notificationError);
+    }
+
     console.log(`${currentUser.fullName} sent friend request to ${targetUser.fullName}`);
 
     res.status(200).json({
@@ -511,6 +538,33 @@ const acceptFriendRequest = async (req, res) => {
 
     // Save updated users
     await writeJson("users.json", users);
+
+    // Send push notification to requester (non-blocking)
+    try {
+      if (requesterUser.expoPushToken) {
+        const notificationResult = await sendPush(
+          [requesterUser.expoPushToken],
+          "Friend Request Accepted!",
+          `${currentUser.fullName} accepted your friend request`,
+          {
+            type: "friend_request_accepted",
+            accepterId: userId,
+            accepterName: currentUser.fullName,
+            requesterId: id,
+            requesterName: requesterUser.fullName
+          }
+        );
+        
+        if (notificationResult.success) {
+          console.log(`Friend request acceptance notification sent to ${requesterUser.fullName} from ${currentUser.fullName}`);
+        } else {
+          console.error(`Failed to send friend request acceptance notification to ${requesterUser.fullName}:`, notificationResult.error);
+        }
+      }
+    } catch (notificationError) {
+      // Don't fail the acceptance if notifications fail
+      console.error("Friend request acceptance notification error:", notificationError);
+    }
 
     console.log(`${currentUser.fullName} accepted friend request from ${requesterUser.fullName}`);
 

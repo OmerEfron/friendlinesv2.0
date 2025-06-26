@@ -3,6 +3,7 @@
 
 const { readJson, writeJson, generateId } = require("../utils/dbUtils");
 const { validatePaginationParams } = require("../utils/validation");
+const { sendPush, getFriendTokens } = require("../utils/notificationService");
 
 /**
  * Create a new group
@@ -106,6 +107,17 @@ const inviteToGroup = async (req, res) => {
       });
     }
 
+    // Get the inviter's user information for notifications
+    const inviter = users.find(u => u.id === userId);
+    if (!inviter) {
+      return res.status(404).json({
+        success: false,
+        message: "Inviter not found",
+        error: "No user found with the provided inviter ID",
+        timestamp: new Date().toISOString(),
+      });
+    }
+
     // Validate that all userIds exist
     const invitedUsers = [];
     for (const inviteUserId of userIds) {
@@ -133,6 +145,37 @@ const inviteToGroup = async (req, res) => {
     group.updatedAt = new Date().toISOString();
     groups[groupIndex] = group;
     await writeJson("groups.json", groups);
+
+    // Send push notifications to invited users (non-blocking)
+    try {
+      for (const inviteUserId of invitedUsers) {
+        const invitedUser = users.find(u => u.id === inviteUserId);
+        if (invitedUser && invitedUser.expoPushToken) {
+          const notificationResult = await sendPush(
+            [invitedUser.expoPushToken],
+            "Group Invitation!",
+            `${inviter.fullName} invited you to join "${group.name}"`,
+            {
+              type: "group_invitation",
+              groupId: group.id,
+              groupName: group.name,
+              inviterId: userId,
+              inviterName: inviter.fullName,
+              invitedUserId: inviteUserId
+            }
+          );
+          
+          if (notificationResult.success) {
+            console.log(`Group invitation notification sent to ${invitedUser.fullName} for group ${group.name}`);
+          } else {
+            console.error(`Failed to send group invitation notification to ${invitedUser.fullName}:`, notificationResult.error);
+          }
+        }
+      }
+    } catch (notificationError) {
+      // Don't fail the invitation if notifications fail
+      console.error("Group invitation notification error:", notificationError);
+    }
 
     console.log(`Invitations sent to ${invitedUsers.length} users for group: ${group.name}`);
 
@@ -169,8 +212,9 @@ const acceptInvitation = async (req, res) => {
     const { id } = req.params;
     const { userId } = req.validatedData;
 
-    // Read groups
+    // Read groups and users
     const groups = await readJson("groups.json");
+    const users = await readJson("users.json");
 
     // Find the group
     const groupIndex = groups.findIndex((g) => g.id === id);
@@ -195,6 +239,17 @@ const acceptInvitation = async (req, res) => {
       });
     }
 
+    // Get user information for notifications
+    const acceptingUser = users.find(u => u.id === userId);
+    if (!acceptingUser) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+        error: "No user found with the provided user ID",
+        timestamp: new Date().toISOString(),
+      });
+    }
+
     // Accept invitation
     group.invites = group.invites.filter(id => id !== userId);
     group.members.push(userId);
@@ -202,6 +257,35 @@ const acceptInvitation = async (req, res) => {
 
     groups[groupIndex] = group;
     await writeJson("groups.json", groups);
+
+    // Send push notification to group owner (non-blocking)
+    try {
+      const groupOwner = users.find(u => u.id === group.ownerId);
+      if (groupOwner && groupOwner.expoPushToken) {
+        const notificationResult = await sendPush(
+          [groupOwner.expoPushToken],
+          "Group Invitation Accepted!",
+          `${acceptingUser.fullName} joined "${group.name}"`,
+          {
+            type: "group_invitation_accepted",
+            groupId: group.id,
+            groupName: group.name,
+            newMemberId: userId,
+            newMemberName: acceptingUser.fullName,
+            ownerId: group.ownerId
+          }
+        );
+        
+        if (notificationResult.success) {
+          console.log(`Group invitation acceptance notification sent to owner ${groupOwner.fullName} for group ${group.name}`);
+        } else {
+          console.error(`Failed to send group invitation acceptance notification to owner ${groupOwner.fullName}:`, notificationResult.error);
+        }
+      }
+    } catch (notificationError) {
+      // Don't fail the acceptance if notifications fail
+      console.error("Group invitation acceptance notification error:", notificationError);
+    }
 
     console.log(`User ${userId} accepted invitation to group: ${group.name}`);
 
@@ -529,8 +613,6 @@ const getGroupPosts = async (req, res) => {
         timestamp: post.timestamp,
         createdAt: post.createdAt,
         updatedAt: post.updatedAt,
-        likesCount: post.likesCount || 0,
-        commentsCount: post.commentsCount || 0,
         sharesCount: post.sharesCount || 0,
         groupIds: post.groupIds || [],
         visibility: post.visibility || "public"

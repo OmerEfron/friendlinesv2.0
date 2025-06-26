@@ -1,11 +1,11 @@
 // Post controller for Friendlines
 // Contains business logic for managing newsflash posts
 
-const { readJson, writeJson } = require("../utils/dbUtils");
-const { generateId, validatePaginationParams } = require("../utils/validation");
+const { readJson, writeJson, generateId } = require("../utils/dbUtils");
 const { generateNewsflash, generateNewsflashGPT } = require("../utils/newsflashGenerator");
-const { sendPush, getFollowersTokens, getGroupMembersTokens, getFriendsTokens, getFriendTokens } = require("../utils/notificationService");
+const { sendPush, getFriendsTokens, getGroupMembersTokens, getFriendTokens } = require("../utils/notificationService");
 const { validateGroupAccess } = require("./groupController");
+const { isValidId, validatePaginationParams } = require("../utils/validation");
 
 /**
  * Get all posts (newsflashes) with pagination
@@ -45,9 +45,15 @@ const getAllPosts = async (req, res) => {
       const postAuthor = userMap[post.userId];
       if (!postAuthor) return false;
 
-      // If no current user, only show public posts (backward compatibility)
+      // If no current user, show more posts in development mode for easier testing
       if (!currentUser) {
-        return post.visibility === "public" || !post.audienceType;
+        if (process.env.NODE_ENV === "development") {
+          // In development, show all posts for better testing
+          return true;
+        } else {
+          // In production, only show public posts (backward compatibility)
+          return post.visibility === "public" || !post.audienceType;
+        }
       }
 
       // Post author can always see their own posts
@@ -112,8 +118,6 @@ const getAllPosts = async (req, res) => {
         groupIds: post.groupIds || [],
         visibility: post.visibility || "public",
         // Social features
-        likesCount: post.likesCount || 0,
-        commentsCount: post.commentsCount || 0,
         sharesCount: post.sharesCount || 0,
       };
     });
@@ -155,6 +159,7 @@ const getPostsByUser = async (req, res) => {
     const { userId } = req.params;
     const { page, limit } = validatePaginationParams(req.query);
     const currentUserId = req.body.currentUserId || req.query.currentUserId; // For authenticated requests
+    const includeFriends = req.query.includeFriends === 'true'; // New flag to include friends' posts
 
     // Read posts and users
     const posts = await readJson("posts.json");
@@ -184,14 +189,28 @@ const getPostsByUser = async (req, res) => {
       return map;
     }, {});
 
+    // Determine which user IDs to include in the search
+    let targetUserIds = [userId];
+    
+    if (includeFriends && user.friends && user.friends.length > 0) {
+      // Include the user's friends' IDs
+      targetUserIds = [userId, ...user.friends];
+    }
+
     // Filter posts by user and apply audience targeting
     const userPosts = posts.filter((post) => {
-      // Must be authored by the target user
-      if (post.userId !== userId) return false;
+      // Must be authored by the target user or their friends (if includeFriends is true)
+      if (!targetUserIds.includes(post.userId)) return false;
 
-      // If no current user, only show public posts (backward compatibility)
+      // If no current user, show more posts in development mode for easier testing
       if (!currentUser) {
-        return post.visibility === "public" || !post.audienceType;
+        if (process.env.NODE_ENV === "development") {
+          // In development, show all posts for better testing
+          return true;
+        } else {
+          // In production, only show public posts (backward compatibility)
+          return post.visibility === "public" || !post.audienceType;
+        }
       }
 
       // Post author can always see their own posts
@@ -235,37 +254,47 @@ const getPostsByUser = async (req, res) => {
     // Get paginated posts
     const paginatedPosts = sortedPosts.slice(startIndex, endIndex);
 
+    // Create a user lookup map for better performance
+    const userMap = users.reduce((map, user) => {
+      map[user.id] = user;
+      return map;
+    }, {});
+
     // Enrich posts with user information
-    const enrichedPosts = paginatedPosts.map((post) => ({
-      id: post.id,
-      userId: post.userId,
-      userFullName: user.fullName,
-      rawText: post.rawText,
-      generatedText: post.generatedText,
-      timestamp: post.timestamp,
-      createdAt: post.createdAt,
-      updatedAt: post.updatedAt,
-      // Audience targeting (only show to authorized users)
-      audienceType: post.audienceType || "public",
-      targetFriendId: post.targetFriendId || null,
-      // Group features
-      groupIds: post.groupIds || [],
-      visibility: post.visibility || "public",
-      // Social features
-      likesCount: post.likesCount || 0,
-      commentsCount: post.commentsCount || 0,
-      sharesCount: post.sharesCount || 0,
-    }));
+    const enrichedPosts = paginatedPosts.map((post) => {
+      const postAuthor = userMap[post.userId];
+      return {
+        id: post.id,
+        userId: post.userId,
+        userFullName: postAuthor ? postAuthor.fullName : "Unknown User",
+        rawText: post.rawText,
+        generatedText: post.generatedText,
+        timestamp: post.timestamp,
+        createdAt: post.createdAt,
+        updatedAt: post.updatedAt,
+        // Audience targeting (only show to authorized users)
+        audienceType: post.audienceType || "public",
+        targetFriendId: post.targetFriendId || null,
+        // Group features
+        groupIds: post.groupIds || [],
+        visibility: post.visibility || "public",
+        // Social features
+        sharesCount: post.sharesCount || 0,
+      };
+    });
 
     res.status(200).json({
       success: true,
-      message: `Posts by ${user.fullName} retrieved successfully`,
+      message: includeFriends 
+        ? `Posts by ${user.fullName} and their friends retrieved successfully`
+        : `Posts by ${user.fullName} retrieved successfully`,
       data: enrichedPosts,
       user: {
         id: user.id,
         fullName: user.fullName,
         email: user.email,
       },
+      includeFriends,
       pagination: {
         page,
         limit,
@@ -297,7 +326,17 @@ const getPostsByUser = async (req, res) => {
 const createPost = async (req, res) => {
   try {
     // Get validated data from middleware
-    const { rawText, userId, audienceType, targetFriendId, groupIds } = req.validatedData;
+    const {
+      rawText,
+      userId,
+      audienceType,
+      targetFriendId,
+      groupIds,
+      generate = true,
+      tone,
+      length,
+      temperature,
+    } = req.validatedData;
 
     // Read users and posts
     const users = await readJson("users.json");
@@ -306,6 +345,7 @@ const createPost = async (req, res) => {
     // Find the user
     const user = users.find((u) => u.id === userId);
     if (!user) {
+      console.error("User not found:", userId);
       return res.status(404).json({
         success: false,
         message: "User not found",
@@ -361,38 +401,44 @@ const createPost = async (req, res) => {
       }
     }
 
-    // Generate newsflash - use deterministic in dev mode, GPT in production
+    // Generate newsflash or use raw text based on generate flag
     let generatedText;
-    try {
-      // In development mode, always use deterministic generator for consistency
-      if (process.env.NODE_ENV === "development") {
-        generatedText = generateNewsflash(rawText, user.fullName);
-      } else if (process.env.OPENAI_API_KEY) {
-        // Production mode with API key - use GPT
-        try {
-          generatedText = await generateNewsflashGPT({
-            rawText,
-            userName: user.fullName,
-            tone: req.body.tone || "satirical",
-            length: req.body.length || "short",
-            temperature: req.body.temperature || 0.7,
-          });
-        } catch (gptError) {
-          console.warn("GPT newsflash generation failed, falling back to deterministic:", gptError.message);
+    if (generate === false) {
+      // Skip newsflash generation, use raw text as is
+      generatedText = rawText;
+    } else {
+      // Generate newsflash - use deterministic in dev mode, GPT in production
+      try {
+        // In development mode, always use deterministic generator for consistency
+        if (process.env.NODE_ENV === "development") {
+          generatedText = generateNewsflash(rawText, user.fullName);
+        } else if (process.env.OPENAI_API_KEY) {
+          // Production mode with API key - use GPT
+          try {
+            generatedText = await generateNewsflashGPT({
+              rawText,
+              userName: user.fullName,
+              tone: tone || "satirical",
+              length: length || "short",
+              temperature: temperature || 0.7,
+            });
+          } catch (gptError) {
+            console.warn("GPT newsflash generation failed, falling back to deterministic:", gptError.message);
+            generatedText = generateNewsflash(rawText, user.fullName);
+          }
+        } else {
+          // Production mode without API key - use deterministic
           generatedText = generateNewsflash(rawText, user.fullName);
         }
-      } else {
-        // Production mode without API key - use deterministic
-        generatedText = generateNewsflash(rawText, user.fullName);
+      } catch (newsflashError) {
+        console.error("Newsflash generation error:", newsflashError);
+        return res.status(400).json({
+          success: false,
+          message: "Failed to generate newsflash",
+          error: newsflashError.message,
+          timestamp: new Date().toISOString(),
+        });
       }
-    } catch (newsflashError) {
-      console.error("Newsflash generation error:", newsflashError);
-      return res.status(400).json({
-        success: false,
-        message: "Failed to generate newsflash",
-        error: newsflashError.message,
-        timestamp: new Date().toISOString(),
-      });
     }
 
     // Determine visibility based on audience type
@@ -427,10 +473,6 @@ const createPost = async (req, res) => {
       groupIds: groupIds || [],
       visibility,
       // Social features
-      likes: [], // Array of user IDs who liked this post
-      comments: [], // Array of comment objects
-      likesCount: 0, // Denormalized count for performance
-      commentsCount: 0, // Denormalized count for performance
       sharesCount: 0, // Share count
     };
 
@@ -518,26 +560,10 @@ const createPost = async (req, res) => {
       console.error("Push notification error:", notificationError);
     }
 
-    // Return created post with user info
-    const responsePost = {
-      id: newPost.id,
-      userId: newPost.userId,
+    // Return new post with user info
+    const enrichedPost = {
+      ...newPost,
       userFullName: user.fullName,
-      rawText: newPost.rawText,
-      generatedText: newPost.generatedText,
-      timestamp: newPost.timestamp,
-      createdAt: newPost.createdAt,
-      updatedAt: newPost.updatedAt,
-      // Audience targeting
-      audienceType: newPost.audienceType,
-      targetFriendId: newPost.targetFriendId,
-      // Group features
-      groupIds: newPost.groupIds,
-      visibility: newPost.visibility,
-      // Social features
-      likesCount: newPost.likesCount,
-      commentsCount: newPost.commentsCount,
-      sharesCount: newPost.sharesCount,
     };
 
     console.log(`New ${finalAudienceType} post created by ${user.fullName}: ${newPost.id}`);
@@ -545,7 +571,7 @@ const createPost = async (req, res) => {
     res.status(201).json({
       success: true,
       message: "Post created successfully",
-      data: responsePost,
+      data: enrichedPost,
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
@@ -657,8 +683,6 @@ const updatePost = async (req, res) => {
       createdAt: posts[postIndex].createdAt,
       updatedAt: posts[postIndex].updatedAt,
       // Social features
-      likesCount: posts[postIndex].likesCount || 0,
-      commentsCount: posts[postIndex].commentsCount || 0,
       sharesCount: posts[postIndex].sharesCount || 0,
     };
 
@@ -776,8 +800,6 @@ const getPostById = async (req, res) => {
       createdAt: post.createdAt,
       updatedAt: post.updatedAt,
       // Social features
-      likesCount: post.likesCount || 0,
-      commentsCount: post.commentsCount || 0,
       sharesCount: post.sharesCount || 0,
     };
 
@@ -908,513 +930,6 @@ const getMostActiveUser = (posts, users) => {
 };
 
 /**
- * Toggle like on a post
- * POST /posts/:id/like
- */
-const likePost = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { userId } = req.body;
-
-    // Validate userId
-    if (!userId || typeof userId !== "string" || userId.trim().length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: "User ID is required",
-        error: "Valid user ID must be provided to like a post",
-        timestamp: new Date().toISOString(),
-      });
-    }
-
-    // Read posts and users
-    const posts = await readJson("posts.json");
-    const users = await readJson("users.json");
-
-    // Find the post
-    const postIndex = posts.findIndex((p) => p.id === id);
-    if (postIndex === -1) {
-      return res.status(404).json({
-        success: false,
-        message: "Post not found",
-        error: "No post found with the provided ID",
-        timestamp: new Date().toISOString(),
-      });
-    }
-
-    // Find the user
-    const user = users.find((u) => u.id === userId);
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: "User not found",
-        error: "No user found with the provided user ID",
-        timestamp: new Date().toISOString(),
-      });
-    }
-
-    const post = posts[postIndex];
-
-    // Ensure likes array exists (for backward compatibility)
-    if (!post.likes) {
-      post.likes = [];
-    }
-
-    // Check if user has already liked this post
-    const likeIndex = post.likes.indexOf(userId);
-    let isLiked = false;
-    let action = "";
-
-    if (likeIndex === -1) {
-      // User hasn't liked the post, add like
-      post.likes.push(userId);
-      isLiked = true;
-      action = "liked";
-    } else {
-      // User has already liked the post, remove like
-      post.likes.splice(likeIndex, 1);
-      isLiked = false;
-      action = "unliked";
-    }
-
-    // Update denormalized count
-    post.likesCount = post.likes.length;
-    post.updatedAt = new Date().toISOString();
-
-    // Update the post in the array
-    posts[postIndex] = post;
-
-    // Save updated posts
-    await writeJson("posts.json", posts);
-
-    console.log(`Post ${action} by ${user.fullName}: ${id}`);
-
-    res.status(200).json({
-      success: true,
-      message: `Post ${action} successfully`,
-      data: {
-        postId: id,
-        userId: userId,
-        isLiked: isLiked,
-        likesCount: post.likesCount,
-        action: action,
-      },
-      timestamp: new Date().toISOString(),
-    });
-  } catch (error) {
-    console.error("Like post error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Internal server error liking post",
-      error:
-        process.env.NODE_ENV === "development"
-          ? error.message
-          : "Something went wrong",
-      timestamp: new Date().toISOString(),
-    });
-  }
-};
-
-/**
- * Get likes for a post
- * GET /posts/:id/likes
- */
-const getLikes = async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    // Read posts and users
-    const posts = await readJson("posts.json");
-    const users = await readJson("users.json");
-
-    // Find the post
-    const post = posts.find((p) => p.id === id);
-    if (!post) {
-      return res.status(404).json({
-        success: false,
-        message: "Post not found",
-        error: "No post found with the provided ID",
-        timestamp: new Date().toISOString(),
-      });
-    }
-
-    // Ensure likes array exists (for backward compatibility)
-    const likes = post.likes || [];
-
-    // Create a user lookup map for better performance
-    const userMap = users.reduce((map, user) => {
-      map[user.id] = user;
-      return map;
-    }, {});
-
-    // Enrich likes with user information
-    const enrichedLikes = likes.map((userId) => {
-      const user = userMap[userId];
-      return {
-        userId: userId,
-        fullName: user ? user.fullName : "Unknown User",
-        email: user ? user.email : null,
-      };
-    });
-
-    res.status(200).json({
-      success: true,
-      message: "Post likes retrieved successfully",
-      data: {
-        postId: id,
-        likesCount: likes.length,
-        likes: enrichedLikes,
-      },
-      timestamp: new Date().toISOString(),
-    });
-  } catch (error) {
-    console.error("Get likes error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Internal server error retrieving likes",
-      error:
-        process.env.NODE_ENV === "development"
-          ? error.message
-          : "Something went wrong",
-      timestamp: new Date().toISOString(),
-    });
-  }
-};
-
-/**
- * Add a comment to a post
- * POST /posts/:id/comments
- */
-const addComment = async (req, res) => {
-  try {
-    const { id } = req.params; // post ID
-    const { userId, text } = req.body;
-
-    // Validate required fields
-    if (!userId || typeof userId !== "string" || userId.trim().length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: "User ID is required",
-        error: "Valid user ID must be provided to comment on a post",
-        timestamp: new Date().toISOString(),
-      });
-    }
-
-    if (!text || typeof text !== "string" || text.trim().length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: "Comment text is required",
-        error: "Comment text cannot be empty",
-        timestamp: new Date().toISOString(),
-      });
-    }
-
-    // Validate comment length (max 500 characters)
-    if (text.trim().length > 500) {
-      return res.status(400).json({
-        success: false,
-        message: "Comment text is too long",
-        error: "Comment must be 500 characters or less",
-        timestamp: new Date().toISOString(),
-      });
-    }
-
-    // Read posts and users
-    const posts = await readJson("posts.json");
-    const users = await readJson("users.json");
-
-    // Find the post
-    const postIndex = posts.findIndex((p) => p.id === id);
-    if (postIndex === -1) {
-      return res.status(404).json({
-        success: false,
-        message: "Post not found",
-        error: "No post found with the provided ID",
-        timestamp: new Date().toISOString(),
-      });
-    }
-
-    // Find the user
-    const user = users.find((u) => u.id === userId);
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: "User not found",
-        error: "No user found with the provided user ID",
-        timestamp: new Date().toISOString(),
-      });
-    }
-
-    const post = posts[postIndex];
-
-    // Ensure comments array exists (for backward compatibility)
-    if (!post.comments) {
-      post.comments = [];
-    }
-
-    // Create new comment
-    const newComment = {
-      id: generateId(),
-      userId: userId,
-      text: text.trim(),
-      timestamp: new Date().toISOString(),
-      createdAt: new Date().toISOString(),
-    };
-
-    // Add comment to post
-    post.comments.push(newComment);
-
-    // Update denormalized count
-    post.commentsCount = post.comments.length;
-    post.updatedAt = new Date().toISOString();
-
-    // Update the post in the array
-    posts[postIndex] = post;
-
-    // Save updated posts
-    await writeJson("posts.json", posts);
-
-    console.log(`Comment added by ${user.fullName} on post: ${id}`);
-
-    // Return comment with user info
-    const enrichedComment = {
-      ...newComment,
-      userFullName: user.fullName,
-    };
-
-    res.status(201).json({
-      success: true,
-      message: "Comment added successfully",
-      data: {
-        postId: id,
-        comment: enrichedComment,
-        commentsCount: post.commentsCount,
-      },
-      timestamp: new Date().toISOString(),
-    });
-  } catch (error) {
-    console.error("Add comment error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Internal server error adding comment",
-      error:
-        process.env.NODE_ENV === "development"
-          ? error.message
-          : "Something went wrong",
-      timestamp: new Date().toISOString(),
-    });
-  }
-};
-
-/**
- * Get comments for a post
- * GET /posts/:id/comments
- */
-const getComments = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { page = 1, limit = 20 } = req.query;
-
-    // Validate pagination parameters
-    const validatedParams = validatePaginationParams({ page, limit });
-
-    // Read posts and users
-    const posts = await readJson("posts.json");
-    const users = await readJson("users.json");
-
-    // Find the post
-    const post = posts.find((p) => p.id === id);
-    if (!post) {
-      return res.status(404).json({
-        success: false,
-        message: "Post not found",
-        error: "No post found with the provided ID",
-        timestamp: new Date().toISOString(),
-      });
-    }
-
-    // Ensure comments array exists (for backward compatibility)
-    const comments = post.comments || [];
-
-    // Sort comments by timestamp (newest first)
-    const sortedComments = comments.sort(
-      (a, b) => new Date(b.timestamp) - new Date(a.timestamp)
-    );
-
-    // Calculate pagination
-    const totalComments = sortedComments.length;
-    const totalPages = Math.ceil(totalComments / validatedParams.limit);
-    const startIndex = (validatedParams.page - 1) * validatedParams.limit;
-    const endIndex = startIndex + validatedParams.limit;
-
-    // Get paginated comments
-    const paginatedComments = sortedComments.slice(startIndex, endIndex);
-
-    // Create a user lookup map for better performance
-    const userMap = users.reduce((map, user) => {
-      map[user.id] = user;
-      return map;
-    }, {});
-
-    // Enrich comments with user information
-    const enrichedComments = paginatedComments.map((comment) => {
-      const user = userMap[comment.userId];
-      return {
-        id: comment.id,
-        userId: comment.userId,
-        userFullName: user ? user.fullName : "Unknown User",
-        text: comment.text,
-        timestamp: comment.timestamp,
-        createdAt: comment.createdAt,
-      };
-    });
-
-    res.status(200).json({
-      success: true,
-      message: "Post comments retrieved successfully",
-      data: {
-        postId: id,
-        commentsCount: totalComments,
-        comments: enrichedComments,
-      },
-      pagination: {
-        page: validatedParams.page,
-        limit: validatedParams.limit,
-        totalComments,
-        totalPages,
-        hasNextPage: validatedParams.page < totalPages,
-        hasPrevPage: validatedParams.page > 1,
-      },
-      timestamp: new Date().toISOString(),
-    });
-  } catch (error) {
-    console.error("Get comments error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Internal server error retrieving comments",
-      error:
-        process.env.NODE_ENV === "development"
-          ? error.message
-          : "Something went wrong",
-      timestamp: new Date().toISOString(),
-    });
-  }
-};
-
-/**
- * Delete a comment from a post
- * DELETE /posts/:postId/comments/:commentId
- */
-const deleteComment = async (req, res) => {
-  try {
-    const { postId, commentId } = req.params;
-    const { userId } = req.body;
-
-    // Validate userId
-    if (!userId || typeof userId !== "string" || userId.trim().length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: "User ID is required",
-        error: "Valid user ID must be provided to delete a comment",
-        timestamp: new Date().toISOString(),
-      });
-    }
-
-    // Read posts and users
-    const posts = await readJson("posts.json");
-    const users = await readJson("users.json");
-
-    // Find the post
-    const postIndex = posts.findIndex((p) => p.id === postId);
-    if (postIndex === -1) {
-      return res.status(404).json({
-        success: false,
-        message: "Post not found",
-        error: "No post found with the provided ID",
-        timestamp: new Date().toISOString(),
-      });
-    }
-
-    // Find the user
-    const user = users.find((u) => u.id === userId);
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: "User not found",
-        error: "No user found with the provided user ID",
-        timestamp: new Date().toISOString(),
-      });
-    }
-
-    const post = posts[postIndex];
-
-    // Ensure comments array exists
-    if (!post.comments) {
-      post.comments = [];
-    }
-
-    // Find the comment
-    const commentIndex = post.comments.findIndex((c) => c.id === commentId);
-    if (commentIndex === -1) {
-      return res.status(404).json({
-        success: false,
-        message: "Comment not found",
-        error: "No comment found with the provided ID",
-        timestamp: new Date().toISOString(),
-      });
-    }
-
-    const comment = post.comments[commentIndex];
-
-    // Check if user is authorized to delete this comment (only comment author can delete)
-    if (comment.userId !== userId) {
-      return res.status(403).json({
-        success: false,
-        message: "Unauthorized",
-        error: "You can only delete your own comments",
-        timestamp: new Date().toISOString(),
-      });
-    }
-
-    // Remove the comment
-    post.comments.splice(commentIndex, 1);
-
-    // Update denormalized count
-    post.commentsCount = post.comments.length;
-    post.updatedAt = new Date().toISOString();
-
-    // Update the post in the array
-    posts[postIndex] = post;
-
-    // Save updated posts
-    await writeJson("posts.json", posts);
-
-    console.log(`Comment deleted by ${user.fullName} on post: ${postId}`);
-
-    res.status(200).json({
-      success: true,
-      message: "Comment deleted successfully",
-      data: {
-        postId: postId,
-        commentId: commentId,
-        commentsCount: post.commentsCount,
-      },
-      timestamp: new Date().toISOString(),
-    });
-  } catch (error) {
-    console.error("Delete comment error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Internal server error deleting comment",
-      error:
-        process.env.NODE_ENV === "development"
-          ? error.message
-          : "Something went wrong",
-      timestamp: new Date().toISOString(),
-    });
-  }
-};
-
-/**
  * Generate a newsflash preview using GPT (without creating a post)
  * POST /posts/generate-newsflash
  */
@@ -1522,6 +1037,90 @@ const generateNewsflashPreview = async (req, res) => {
   }
 };
 
+/**
+ * Get all posts for development testing (no filtering)
+ * GET /posts/dev/all
+ */
+const getAllPostsDev = async (req, res) => {
+  try {
+    // Only allow in development mode
+    if (process.env.NODE_ENV !== "development") {
+      return res.status(404).json({
+        success: false,
+        message: "Endpoint not found",
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    const { page, limit } = validatePaginationParams(req.query);
+
+    // Read posts and users
+    const posts = await readJson("posts.json");
+    const users = await readJson("users.json");
+
+    // Create a user lookup map for better performance
+    const userMap = users.reduce((map, user) => {
+      map[user.id] = user;
+      return map;
+    }, {});
+
+    // Sort posts by timestamp (newest first)
+    const sortedPosts = posts.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+    // Calculate pagination
+    const totalPosts = sortedPosts.length;
+    const totalPages = Math.ceil(totalPosts / limit);
+    const startIndex = (page - 1) * limit;
+    const endIndex = startIndex + limit;
+
+    // Get paginated posts
+    const paginatedPosts = sortedPosts.slice(startIndex, endIndex);
+
+    // Enrich posts with user information
+    const enrichedPosts = paginatedPosts.map((post) => {
+      const user = userMap[post.userId];
+      return {
+        id: post.id,
+        userId: post.userId,
+        userFullName: user ? user.fullName : "Unknown User",
+        rawText: post.rawText,
+        generatedText: post.generatedText,
+        timestamp: post.timestamp,
+        createdAt: post.createdAt,
+        updatedAt: post.updatedAt,
+        audienceType: post.audienceType || "public",
+        targetFriendId: post.targetFriendId || null,
+        groupIds: post.groupIds || [],
+        visibility: post.visibility || "public",
+        sharesCount: post.sharesCount || 0,
+      };
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "All posts retrieved (development mode)",
+      data: enrichedPosts,
+      pagination: {
+        page,
+        limit,
+        totalPosts,
+        totalPages,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1,
+      },
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error("Get all posts dev error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error retrieving posts",
+      error: process.env.NODE_ENV === "development" ? error.message : "Something went wrong",
+      timestamp: new Date().toISOString(),
+    });
+  }
+};
+
 module.exports = {
   getAllPosts,
   getPostsByUser,
@@ -1530,10 +1129,6 @@ module.exports = {
   deletePost,
   getPostById,
   getPostStats,
-  likePost,
-  getLikes,
-  addComment,
-  getComments,
-  deleteComment,
   generateNewsflashPreview,
+  getAllPostsDev,
 };

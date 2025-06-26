@@ -1,0 +1,21 @@
+[build]
+builder = "nixpacks"
+
+[deploy]
+startCommand = "npm start"
+healthcheckPath = "/health"
+healthcheckTimeout = 300
+
+[[deploy.environmentVariables]]
+name = "NODE_ENV"
+value = "production"
+
+[[deploy.environmentVariables]]
+name = "PORT"
+value = "3000"
+
+[environments.production]
+variables = { NODE_ENV = "production" }
+
+[environments.staging]
+variables = { NODE_ENV = "staging" } 

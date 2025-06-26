@@ -6,6 +6,7 @@ const cors = require("cors");
 const helmet = require("helmet");
 const path = require("path");
 const { initializeDatabase, initializeDataFiles, closeDatabase } = require("./utils/dbUtils");
+const { initializeDevData } = require("./utils/devDataInitializer");
 const uploadRoutes = require('./routes/upload');
 const notificationRoutes = require('./routes/notifications');
 const socialRoutes = require('./routes/social');
@@ -132,10 +133,13 @@ app.get("/", (req, res) => {
           updateProfile: "PUT /api/users/:id",
           checkUser: "POST /api/users/check",
           userStats: "GET /api/users/stats",
-          follow: "POST /api/users/:id/follow",
-          followers: "GET /api/users/:id/followers",
-          following: "GET /api/users/:id/following",
-          followStatus: "GET /api/users/:id/follow-status"
+          friendRequest: "POST /api/users/:id/friend-request",
+          acceptFriend: "POST /api/users/:id/accept-friend",
+          rejectFriend: "POST /api/users/:id/reject-friend",
+          unfriend: "POST /api/users/:id/unfriend",
+          friends: "GET /api/users/:id/friends",
+          friendRequests: "GET /api/users/:id/friend-requests",
+          friendshipStatus: "GET /api/users/:id/friendship-status"
         },
         posts: {
           getAllPosts: "GET /api/posts",
@@ -143,14 +147,9 @@ app.get("/", (req, res) => {
           createPost: "POST /api/posts",
           updatePost: "PUT /api/posts/:id",
           deletePost: "DELETE /api/posts/:id",
-          getPost: "GET /api/posts/single/:id",
-          postStats: "GET /api/posts/stats",
-          likePost: "POST /api/posts/:id/like",
-          getLikes: "GET /api/posts/:id/likes",
-          addComment: "POST /api/posts/:id/comments",
-          getComments: "GET /api/posts/:id/comments",
-          deleteComment: "DELETE /api/posts/:postId/comments/:commentId",
-          generateNewsflash: "POST /api/posts/generate-newsflash"
+          getPostDetails: "GET /api/posts/:id/details",
+          postStats: "GET /api/posts/:id/stats",
+          generateNewsflashPreview: "POST /api/posts/preview"
         },
         groups: {
           createGroup: "POST /api/groups/:userId",
@@ -171,7 +170,7 @@ app.get("/", (req, res) => {
         social: {
           mutualFriends: "GET /api/social/users/:id/mutual-friends",
           friendSuggestions: "GET /api/social/users/:id/friend-suggestions",
-          bulkFollowStatus: "POST /api/social/users/follow-status"
+          bulkFriendshipStatus: "POST /api/social/users/friendship-status"
         },
         reset: {
           resetAll: "POST /api/reset",
@@ -272,6 +271,12 @@ const startServer = async () => {
     await initializeDataFiles();
     console.log("✅ Data files initialized");
 
+    // Initialize development data if in development mode
+    if (NODE_ENV === "development") {
+      await initializeDevData();
+      console.log("✅ Development data initialized");
+    }
+
     // Start server
     const server = app.listen(PORT, () => {
       console.log("🚀 Friendlines Backend Server Started!");
@@ -285,6 +290,7 @@ const startServer = async () => {
         console.log(
           "🛠️  Development mode - Reset endpoint available at POST /api/reset"
         );
+        console.log("🧪 Test user: test@example.com (ID: utest123456789)");
       }
     });
 

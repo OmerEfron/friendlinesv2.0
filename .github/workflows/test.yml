@@ -1,0 +1,132 @@
+name: Test Suite
+
+on:
+  pull_request:
+    branches: [ main, develop ]
+  push:
+    branches: [ develop ]
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  test:
+    name: 🧪 Run Tests
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        node-version: [18, 20]
+    
+    steps:
+    - name: 📦 Checkout code
+      uses: actions/checkout@v4
+      
+    - name: 🚀 Setup Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+        
+    - name: 📥 Install dependencies
+      run: npm ci
+      
+    - name: 🧪 Run tests
+      run: npm test
+      env:
+        NODE_ENV: test
+        
+    - name: 📊 Generate coverage report
+      run: npm test -- --coverage
+      
+    - name: 📤 Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+        file: ./coverage/lcov.info
+        flags: unittests
+        name: codecov-umbrella
+
+  lint:
+    name: 🔍 Code Quality
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📦 Checkout code
+      uses: actions/checkout@v4
+      
+    - name: 🚀 Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        
+    - name: 📥 Install dependencies
+      run: npm ci
+      
+    - name: 🔍 Run ESLint
+      run: npm run lint || echo "ESLint not configured"
+      
+    - name: 🎨 Check Prettier formatting
+      run: npm run format:check || echo "Prettier not configured"
+
+  security:
+    name: 🔒 Security Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📦 Checkout code
+      uses: actions/checkout@v4
+      
+    - name: 🚀 Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        
+    - name: 📥 Install dependencies
+      run: npm ci
+      
+    - name: 🔒 Run npm audit
+      run: npm audit --audit-level=moderate
+      
+    - name: 🛡️ Run Snyk security scan
+      uses: snyk/actions/node@master
+      continue-on-error: true
+      env:
+        SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+
+  compatibility:
+    name: 🔄 API Compatibility
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📦 Checkout code
+      uses: actions/checkout@v4
+      
+    - name: 🚀 Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        
+    - name: 📥 Install dependencies
+      run: npm ci
+      
+    - name: 🚀 Start server
+      run: npm start &
+      env:
+        NODE_ENV: test
+        PORT: 3001
+        
+    - name: ⏳ Wait for server
+      run: sleep 10
+      
+    - name: 🏥 Health check
+      run: |
+        curl -f http://localhost:3001/health || exit 1
+        
+    - name: 🔍 API endpoints test
+      run: |
+        curl -f http://localhost:3001/ || exit 1
+        curl -f http://localhost:3001/api/posts || exit 1 

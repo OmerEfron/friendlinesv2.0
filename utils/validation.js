@@ -134,7 +134,7 @@ const validatePostData = (postData) => {
     return { isValid: false, errors };
   }
 
-  const { rawText, userId, audienceType, targetFriendId, groupIds } = postData;
+  const { rawText, userId, audienceType, targetFriendId, groupIds, generate } = postData;
 
   // Validate user ID
   if (!userId || typeof userId !== "string" || userId.trim().length === 0) {
@@ -145,6 +145,11 @@ const validatePostData = (postData) => {
   const textValidation = validatePostText(rawText);
   if (!textValidation.isValid) {
     errors.push(...textValidation.errors);
+  }
+
+  // Validate generate field (optional, defaults to true)
+  if (generate !== undefined && typeof generate !== "boolean") {
+    errors.push("Generate field must be a boolean value");
   }
 
   // Validate audience type (optional for backward compatibility)
@@ -212,6 +217,7 @@ const validatePostData = (postData) => {
       audienceType: audienceType ? audienceType.trim() : undefined,
       targetFriendId: targetFriendId ? targetFriendId.trim() : undefined,
       groupIds: groupIds ? groupIds.map(id => id.trim()).filter(Boolean) : [],
+      generate: generate !== undefined ? generate : true, // Default to true for backward compatibility
     },
   };
 };

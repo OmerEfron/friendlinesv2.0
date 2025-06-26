@@ -1,0 +1,17 @@
+[providers]
+node = "20"
+
+[variables]
+NODE_ENV = "production"
+
+[phases.setup]
+nixPkgs = ["nodejs_20", "npm"]
+
+[phases.install]
+cmds = ["npm ci --production"]
+
+[phases.build]
+cmds = ["echo 'No build step required for Node.js API'"]
+
+[start]
+cmd = "npm start" 

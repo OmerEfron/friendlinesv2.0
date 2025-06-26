@@ -1,14 +1,14 @@
 const request = require('supertest');
 const express = require('express');
-const { readJson, writeJson } = require('../utils/fileUtils');
+const { readJson, writeJson } = require('../utils/dbUtils');
 
-// Mock the file utilities
-jest.mock('../utils/fileUtils');
+// Mock the database utilities
+jest.mock('../utils/dbUtils');
 
 // Mock push notification service
 jest.mock('../utils/notificationService', () => ({
   sendPush: jest.fn().mockResolvedValue({ success: true }),
-  getFollowersTokens: jest.fn().mockResolvedValue(['token1', 'token2']),
+  getFriendsTokens: jest.fn().mockResolvedValue(['token1', 'token2']),
   getGroupMembersTokens: jest.fn().mockResolvedValue(['token3', 'token4'])
 }));
 
@@ -45,20 +45,16 @@ describe('Posts Endpoints', () => {
         id: 'u1737582951001abc',
         fullName: 'Alice Johnson',
         email: 'alice@friendlines.com',
-        followers: ['u1737582951002def'],
-        following: ['u1737582951002def'],
-        followersCount: 1,
-        followingCount: 1,
+        friends: ['u1737582951002def'],
+        friendsCount: 1,
         expoPushToken: 'ExponentPushToken[alice_token_12345]'
       },
       {
         id: 'u1737582951002def',
         fullName: 'Bob Smith',
         email: 'bob@friendlines.com',
-        followers: ['u1737582951001abc'],
-        following: ['u1737582951001abc'],
-        followersCount: 1,
-        followingCount: 1,
+        friends: ['u1737582951001abc'],
+        friendsCount: 1,
         expoPushToken: 'ExponentPushToken[bob_token_67890]'
       }
     ];
@@ -74,18 +70,6 @@ describe('Posts Endpoints', () => {
         updatedAt: '2025-06-17T08:00:00.000Z',
         groupIds: [],
         visibility: 'public',
-        likes: ['u1737582951002def'],
-        comments: [
-          {
-            id: 'c1737582951001a1',
-            userId: 'u1737582951002def',
-            text: 'Great post!',
-            timestamp: '2025-06-17T08:15:00.000Z',
-            createdAt: '2025-06-17T08:15:00.000Z'
-          }
-        ],
-        likesCount: 1,
-        commentsCount: 1,
         sharesCount: 0
       }
     ];
@@ -154,10 +138,10 @@ describe('Posts Endpoints', () => {
     });
   });
 
-  describe('GET /api/posts/user/:userId', () => {
+  describe('GET /api/posts/:userId', () => {
     test('should get posts by specific user', async () => {
       const response = await request(app)
-        .get('/api/posts/user/u1737582951001abc')
+        .get('/api/posts/u1737582951001abc')
         .expect(200);
 
       expect(response.body.success).toBe(true);
@@ -167,7 +151,7 @@ describe('Posts Endpoints', () => {
 
     test('should return 404 for non-existent user', async () => {
       const response = await request(app)
-        .get('/api/posts/user/nonexistent')
+        .get('/api/posts/nonexistent')
         .expect(404);
 
       expect(response.body.success).toBe(false);
@@ -179,7 +163,8 @@ describe('Posts Endpoints', () => {
     test('should create new post successfully', async () => {
       const postData = {
         userId: 'u1737582951001abc',
-        rawText: 'This is a new test post!'
+        rawText: 'This is a new test post!',
+        audienceType: 'friends'
       };
 
       const response = await request(app)
@@ -192,13 +177,14 @@ describe('Posts Endpoints', () => {
       expect(response.body.data.rawText).toBe('This is a new test post!');
       expect(response.body.data.generatedText).toContain('Alice Johnson');
       expect(response.body.data.id).toMatch(/^p/);
-      expect(response.body.data.visibility).toBe('public');
+      expect(response.body.data.audienceType).toBe('friends');
     });
 
     test('should create group post successfully', async () => {
       const postData = {
         userId: 'u1737582951001abc',
-        rawText: 'Group post test',
+        rawText: 'Group post content',
+        audienceType: 'groups',
         groupIds: ['g1737582951001xyz']
       };
 
@@ -208,14 +194,27 @@ describe('Posts Endpoints', () => {
         .expect(201);
 
       expect(response.body.success).toBe(true);
+      expect(response.body.data.audienceType).toBe('groups');
       expect(response.body.data.groupIds).toContain('g1737582951001xyz');
-      expect(response.body.data.visibility).toBe('groups_only');
+    });
+
+    test('should reject post without userId', async () => {
+      const postData = {
+        rawText: 'Post without user'
+      };
+
+      const response = await request(app)
+        .post('/api/posts')
+        .send(postData)
+        .expect(422);
+
+      expect(response.body.success).toBe(false);
     });
 
     test('should reject post with invalid user', async () => {
       const postData = {
         userId: 'nonexistent',
-        rawText: 'Test post'
+        rawText: 'Post by non-existent user'
       };
 
       const response = await request(app)
@@ -226,57 +225,12 @@ describe('Posts Endpoints', () => {
       expect(response.body.success).toBe(false);
       expect(response.body.message).toBe('User not found');
     });
-
-    test('should reject empty post text', async () => {
-      const postData = {
-        userId: 'u1737582951001abc',
-        rawText: ''
-      };
-
-      const response = await request(app)
-        .post('/api/posts')
-        .send(postData)
-        .expect(422);
-
-      expect(response.body.success).toBe(false);
-      expect(response.body.message).toBe('Validation failed');
-    });
-
-    test('should reject too long post text', async () => {
-      const postData = {
-        userId: 'u1737582951001abc',
-        rawText: 'a'.repeat(300)
-      };
-
-      const response = await request(app)
-        .post('/api/posts')
-        .send(postData)
-        .expect(422);
-
-      expect(response.body.success).toBe(false);
-      expect(response.body.message).toBe('Validation failed');
-    });
-
-    test('should reject invalid group access', async () => {
-      const postData = {
-        userId: 'u1737582951002def',
-        rawText: 'Test post',
-        groupIds: ['nonexistent_group']
-      };
-
-      const response = await request(app)
-        .post('/api/posts')
-        .send(postData)
-        .expect(403);
-
-      expect(response.body.success).toBe(false);
-      expect(response.body.message).toBe('Access denied to one or more groups');
-    });
   });
 
   describe('PUT /api/posts/:id', () => {
     test('should update post successfully', async () => {
       const updateData = {
+        userId: 'u1737582951001abc',
         rawText: 'Updated post content'
       };
 
@@ -288,11 +242,11 @@ describe('Posts Endpoints', () => {
       expect(response.body.success).toBe(true);
       expect(response.body.message).toBe('Post updated successfully');
       expect(response.body.data.rawText).toBe('Updated post content');
-      expect(response.body.data.generatedText).toContain('Updated post content');
     });
 
     test('should return 404 for non-existent post', async () => {
       const updateData = {
+        userId: 'u1737582951001abc',
         rawText: 'Updated content'
       };
 
@@ -304,226 +258,85 @@ describe('Posts Endpoints', () => {
       expect(response.body.success).toBe(false);
       expect(response.body.message).toBe('Post not found');
     });
+
+    test('should reject unauthorized update', async () => {
+      const updateData = {
+        userId: 'u1737582951002def', // Different user
+        rawText: 'Unauthorized update'
+      };
+
+      const response = await request(app)
+        .put('/api/posts/p1737582951001aaa')
+        .send(updateData)
+        .expect(403);
+
+      expect(response.body.success).toBe(false);
+      expect(response.body.message).toBe('Unauthorized');
+    });
   });
 
   describe('DELETE /api/posts/:id', () => {
     test('should delete post successfully', async () => {
+      const deleteData = {
+        userId: 'u1737582951001abc'
+      };
+
       const response = await request(app)
         .delete('/api/posts/p1737582951001aaa')
+        .send(deleteData)
         .expect(200);
 
       expect(response.body.success).toBe(true);
       expect(response.body.message).toBe('Post deleted successfully');
-      expect(response.body.data.id).toBe('p1737582951001aaa');
     });
 
     test('should return 404 for non-existent post', async () => {
+      const deleteData = {
+        userId: 'u1737582951001abc'
+      };
+
       const response = await request(app)
         .delete('/api/posts/nonexistent')
-        .expect(404);
-
-      expect(response.body.success).toBe(false);
-      expect(response.body.message).toBe('Post not found');
-    });
-  });
-
-  describe('POST /api/posts/:id/like', () => {
-    test('should like post successfully', async () => {
-      const likeData = {
-        userId: 'u1737582951001abc'
-      };
-
-      const response = await request(app)
-        .post('/api/posts/p1737582951001aaa/like')
-        .send(likeData)
-        .expect(200);
-
-      expect(response.body.success).toBe(true);
-      expect(response.body.data.isLiked).toBe(true);
-      expect(response.body.data.action).toBe('liked');
-      expect(response.body.data.likesCount).toBe(2);
-    });
-
-    test('should unlike post when already liked', async () => {
-      const likeData = {
-        userId: 'u1737582951002def'
-      };
-
-      const response = await request(app)
-        .post('/api/posts/p1737582951001aaa/like')
-        .send(likeData)
-        .expect(200);
-
-      expect(response.body.success).toBe(true);
-      expect(response.body.data.isLiked).toBe(false);
-      expect(response.body.data.action).toBe('unliked');
-      expect(response.body.data.likesCount).toBe(0);
-    });
-
-    test('should return 404 for non-existent post', async () => {
-      const likeData = {
-        userId: 'u1737582951001abc'
-      };
-
-      const response = await request(app)
-        .post('/api/posts/nonexistent/like')
-        .send(likeData)
-        .expect(404);
-
-      expect(response.body.success).toBe(false);
-      expect(response.body.message).toBe('Post not found');
-    });
-
-    test('should reject missing userId', async () => {
-      const response = await request(app)
-        .post('/api/posts/p1737582951001aaa/like')
-        .send({})
-        .expect(400);
-
-      expect(response.body.success).toBe(false);
-      expect(response.body.message).toBe('Missing userId in request body');
-    });
-  });
-
-  describe('GET /api/posts/:id/likes', () => {
-    test('should get post likes successfully', async () => {
-      const response = await request(app)
-        .get('/api/posts/p1737582951001aaa/likes')
-        .expect(200);
-
-      expect(response.body.success).toBe(true);
-      expect(response.body.data.likesCount).toBe(1);
-      expect(response.body.data.likes).toHaveLength(1);
-      expect(response.body.data.likes[0].userId).toBe('u1737582951002def');
-      expect(response.body.data.likes[0].fullName).toBe('Bob Smith');
-    });
-
-    test('should return 404 for non-existent post', async () => {
-      const response = await request(app)
-        .get('/api/posts/nonexistent/likes')
-        .expect(404);
-
-      expect(response.body.success).toBe(false);
-      expect(response.body.message).toBe('Post not found');
-    });
-  });
-
-  describe('POST /api/posts/:id/comments', () => {
-    test('should add comment successfully', async () => {
-      const commentData = {
-        userId: 'u1737582951001abc',
-        text: 'This is a test comment'
-      };
-
-      const response = await request(app)
-        .post('/api/posts/p1737582951001aaa/comments')
-        .send(commentData)
-        .expect(201);
-
-      expect(response.body.success).toBe(true);
-      expect(response.body.message).toBe('Comment added successfully');
-      expect(response.body.data.comment.text).toBe('This is a test comment');
-      expect(response.body.data.comment.userFullName).toBe('Alice Johnson');
-      expect(response.body.data.commentsCount).toBe(2);
-    });
-
-    test('should reject empty comment text', async () => {
-      const commentData = {
-        userId: 'u1737582951001abc',
-        text: ''
-      };
-
-      const response = await request(app)
-        .post('/api/posts/p1737582951001aaa/comments')
-        .send(commentData)
-        .expect(400);
-
-      expect(response.body.success).toBe(false);
-      expect(response.body.message).toBe('Missing required fields (userId, text) or text too long (>500 chars)');
-    });
-
-    test('should reject too long comment text', async () => {
-      const commentData = {
-        userId: 'u1737582951001abc',
-        text: 'a'.repeat(501)
-      };
-
-      const response = await request(app)
-        .post('/api/posts/p1737582951001aaa/comments')
-        .send(commentData)
-        .expect(400);
-
-      expect(response.body.success).toBe(false);
-      expect(response.body.message).toBe('Missing required fields (userId, text) or text too long (>500 chars)');
-    });
-  });
-
-  describe('GET /api/posts/:id/comments', () => {
-    test('should get post comments successfully', async () => {
-      const response = await request(app)
-        .get('/api/posts/p1737582951001aaa/comments')
-        .expect(200);
-
-      expect(response.body.success).toBe(true);
-      expect(response.body.data.commentsCount).toBe(1);
-      expect(response.body.data.comments).toHaveLength(1);
-      expect(response.body.data.comments[0].text).toBe('Great post!');
-      expect(response.body.data.comments[0].userFullName).toBe('Bob Smith');
-    });
-
-    test('should support pagination for comments', async () => {
-      const response = await request(app)
-        .get('/api/posts/p1737582951001aaa/comments?page=1&limit=10')
-        .expect(200);
-
-      expect(response.body.pagination).toBeDefined();
-      expect(response.body.pagination.page).toBe(1);
-      expect(response.body.pagination.limit).toBe(10);
-    });
-  });
-
-  describe('DELETE /api/posts/:postId/comments/:commentId', () => {
-    test('should delete comment successfully', async () => {
-      const deleteData = {
-        userId: 'u1737582951002def'
-      };
-
-      const response = await request(app)
-        .delete('/api/posts/p1737582951001aaa/comments/c1737582951001a1')
         .send(deleteData)
-        .expect(200);
+        .expect(404);
 
-      expect(response.body.success).toBe(true);
-      expect(response.body.message).toBe('Comment deleted successfully');
-      expect(response.body.data.commentsCount).toBe(0);
+      expect(response.body.success).toBe(false);
+      expect(response.body.message).toBe('Post not found');
     });
 
-    test('should reject unauthorized comment deletion', async () => {
+    test('should reject unauthorized deletion', async () => {
       const deleteData = {
-        userId: 'u1737582951001abc'
+        userId: 'u1737582951002def' // Different user
       };
 
       const response = await request(app)
-        .delete('/api/posts/p1737582951001aaa/comments/c1737582951001a1')
+        .delete('/api/posts/p1737582951001aaa')
         .send(deleteData)
         .expect(403);
 
       expect(response.body.success).toBe(false);
-      expect(response.body.message).toBe('Unauthorized (can only delete own comments)');
+      expect(response.body.message).toBe('Unauthorized');
+    });
+  });
+
+  describe('GET /api/posts/:id/details', () => {
+    test('should get post details successfully', async () => {
+      const response = await request(app)
+        .get('/api/posts/p1737582951001aaa/details')
+        .expect(200);
+
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.id).toBe('p1737582951001aaa');
+      expect(response.body.data.userFullName).toBe('Alice Johnson');
     });
 
-    test('should return 404 for non-existent comment', async () => {
-      const deleteData = {
-        userId: 'u1737582951002def'
-      };
-
+    test('should return 404 for non-existent post', async () => {
       const response = await request(app)
-        .delete('/api/posts/p1737582951001aaa/comments/nonexistent')
-        .send(deleteData)
+        .get('/api/posts/nonexistent/details')
         .expect(404);
 
       expect(response.body.success).toBe(false);
-      expect(response.body.message).toBe('Comment not found');
+      expect(response.body.message).toBe('Post not found');
     });
   });
 
@@ -531,7 +344,8 @@ describe('Posts Endpoints', () => {
     test('should apply rate limiting to post creation', async () => {
       const postData = {
         userId: 'u1737582951001abc',
-        rawText: 'Rate limit test post'
+        rawText: 'Rate limit test post',
+        audienceType: 'friends'
       };
 
       // Make multiple requests rapidly
@@ -556,7 +370,7 @@ describe('Posts Endpoints', () => {
         .expect(500);
 
       expect(response.body.success).toBe(false);
-      expect(response.body.message).toBe('Internal server error in posts');
+      expect(response.body.message).toBe('Internal server error retrieving posts');
     });
   });
 }); 

@@ -1,5 +1,5 @@
 const express = require('express');
-const { getMutualFriends, getFriendSuggestions, bulkFollowStatus } = require('../controllers/socialController');
+const { getMutualFriends, getFriendSuggestions, bulkFriendshipStatus } = require('../controllers/socialController');
 const { validateIdMiddleware, ensureBodyExists } = require('../middleware/validation');
 const { getGeneralLimiter } = require('../middleware/rateLimiter');
 
@@ -23,7 +23,7 @@ router.get('/users/:id/friend-suggestions',
 router.post('/users/friendship-status',
   getGeneralLimiter(),
   ensureBodyExists,
-  bulkFollowStatus
+  bulkFriendshipStatus
 );
 
 module.exports = router; 

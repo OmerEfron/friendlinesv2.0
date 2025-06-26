@@ -83,13 +83,13 @@ const initializeDataFiles = async () => {
       if (!Array.isArray(users) || users.length === 0) {
         await writeJson("users.json", []);
       } else {
-        // Migrate existing users to include social fields
+        // Migrate existing users to include friendship fields if they don't exist
         const migratedUsers = users.map(user => ({
           ...user,
-          followers: user.followers || [],
-          following: user.following || [],
-          followersCount: user.followersCount || 0,
-          followingCount: user.followingCount || 0,
+          friends: user.friends || [],
+          friendRequests: user.friendRequests || [],
+          sentFriendRequests: user.sentFriendRequests || [],
+          friendsCount: user.friendsCount || 0,
         }));
         await writeJson("users.json", migratedUsers);
       }
@@ -106,10 +106,6 @@ const initializeDataFiles = async () => {
         // Migrate existing posts to include social fields
         const migratedPosts = posts.map(post => ({
           ...post,
-          likes: post.likes || [],
-          comments: post.comments || [],
-          likesCount: post.likesCount || 0,
-          commentsCount: post.commentsCount || 0,
           sharesCount: post.sharesCount || 0,
         }));
         await writeJson("posts.json", migratedPosts);

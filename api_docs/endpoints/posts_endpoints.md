@@ -60,14 +60,23 @@ Get posts by a specific user with pagination and audience filtering.
 - `page`: Page number (default: 1)
 - `limit`: Items per page (default: 20, max: 100)
 - `currentUserId`: (Optional) Current user ID for audience filtering
+- `includeFriends`: (Optional) Include friends' posts when set to "true" (default: false)
 
-**Note:** Posts will be filtered based on audience targeting. Users can only see posts they're authorized to view.
+**Examples:**
+- Get only user's posts: `GET /api/posts/u123456789`
+- Get user's posts and friends' posts: `GET /api/posts/u123456789?includeFriends=true`
+- With pagination and audience filtering: `GET /api/posts/u123456789?includeFriends=true&page=1&limit=10&currentUserId=u123456789`
+
+**Note:** 
+- Posts will be filtered based on audience targeting. Users can only see posts they're authorized to view.
+- When `includeFriends=true`, the endpoint returns posts from both the target user and their friends, sorted by timestamp (newest first).
+- The `includeFriends` flag respects the same audience targeting rules - you'll only see friends' posts that you're authorized to view.
 
 **Response:**
 ```json
 {
   "success": true,
-  "message": "Posts by John Doe retrieved successfully",
+  "message": "Posts by John Doe and their friends retrieved successfully",
   "data": [
     {
       "id": "p987654321",
@@ -85,6 +94,22 @@ Get posts by a specific user with pagination and audience filtering.
       "likesCount": 0,
       "commentsCount": 0,
       "sharesCount": 0
+    },
+    {
+      "id": "p987654322",
+      "userId": "u987654321",
+      "userFullName": "Jane Smith",
+      "rawText": "Great coffee this morning! ☕",
+      "generatedText": "BREAKING: Jane Smith reports excellent coffee quality! ☕",
+      "timestamp": "2025-06-14T17:30:00.000Z",
+      "createdAt": "2025-06-14T17:30:00.000Z",
+      "updatedAt": "2025-06-14T17:30:00.000Z",
+      "audienceType": "friends",
+      "targetFriendId": null,
+      "groupIds": [],
+      "visibility": "friends_only",
+
+      "sharesCount": 0
     }
   ],
   "user": {
@@ -92,10 +117,11 @@ Get posts by a specific user with pagination and audience filtering.
     "fullName": "John Doe",
     "email": "john@example.com"
   },
+  "includeFriends": true,
   "pagination": {
     "page": 1,
     "limit": 20,
-    "totalPosts": 1,
+    "totalPosts": 2,
     "totalPages": 1,
     "hasNextPage": false,
     "hasPrevPage": false
@@ -103,6 +129,10 @@ Get posts by a specific user with pagination and audience filtering.
   "timestamp": "2025-06-14T18:00:00.000Z"
 }
 ```
+
+**Response Fields:**
+- `includeFriends`: Boolean indicating whether friends' posts were included in the results
+- `userFullName`: The actual author's name for each post (since posts can come from different users when `includeFriends=true`)
 
 **Error Responses:**
 - `400`: Invalid user ID format
@@ -123,6 +153,7 @@ Create a new post with automatic newsflash generation and audience targeting.
   "audienceType": "friends",
   "targetFriendId": null,
   "groupIds": [],
+  "generate": true,
   "tone": "satirical",
   "length": "short",
   "temperature": 0.7
@@ -135,6 +166,7 @@ Create a new post with automatic newsflash generation and audience targeting.
 - `audienceType`: Required, one of: "friends", "groups", "friend"
 - `targetFriendId`: Required if audienceType is "friend", must be a valid friend
 - `groupIds`: Required if audienceType is "groups", max 5 group IDs, no duplicates
+- `generate`: Optional, boolean (default: true) - when false, skips newsflash generation and uses raw text as generated text
 - `tone`: Optional, newsflash tone (e.g., "satirical", "serious", "humorous", "sarcastic")
 - `length`: Optional, "short" or "long" (affects GPT generation)
 - `temperature`: Optional, 0-2 (GPT creativity level, default: 0.7)
@@ -182,11 +214,16 @@ Create a new post with automatic newsflash generation and audience targeting.
 ```
 
 **Newsflash Generation:**
-- **Development Mode**: Always uses deterministic generation for consistency
-- **Production Mode**: Uses OpenAI GPT if `OPENAI_API_KEY` environment variable is set
-- Falls back to deterministic generation if GPT fails or API key is missing
-- GPT generation supports configurable tone, length, and temperature
-- Deterministic generation uses rule-based text transformation
+- **Default Behavior** (`generate: true` or omitted):
+  - **Development Mode**: Always uses deterministic generation for consistency
+  - **Production Mode**: Uses OpenAI GPT if `OPENAI_API_KEY` environment variable is set
+  - Falls back to deterministic generation if GPT fails or API key is missing
+  - GPT generation supports configurable tone, length, and temperature
+  - Deterministic generation uses rule-based text transformation
+- **Skip Generation** (`generate: false`):
+  - Uses the raw text as the generated text without any transformation
+  - Useful for posts where users want to keep their original text as-is
+  - Ignores tone, length, and temperature parameters
 
 **Push Notifications:**
 - **Friends posts**: Notify all user's friends

@@ -46,9 +46,9 @@ describe('Notification System Tests', () => {
     });
 
     test('should return notifications with pagination', async () => {
-      // Create some test notifications by having user2 follow user1
+      // Create some test notifications by having user2 send friend request to user1
       await request(app)
-        .post(`/api/users/${testUserId1}/follow`)
+        .post(`/api/users/${testUserId1}/friend-request`)
         .send({ userId: testUserId2 });
 
       // Create a post to trigger notifications
@@ -71,7 +71,7 @@ describe('Notification System Tests', () => {
     test('should filter unread notifications when requested', async () => {
       // Create some test notifications
       await request(app)
-        .post(`/api/users/${testUserId1}/follow`)
+        .post(`/api/users/${testUserId1}/friend-request`)
         .send({ userId: testUserId2 });
 
       const response = await request(app)
@@ -104,7 +104,7 @@ describe('Notification System Tests', () => {
     test('should mark notifications as read successfully', async () => {
       // Create some test notifications
       await request(app)
-        .post(`/api/users/${testUserId1}/follow`)
+        .post(`/api/users/${testUserId1}/friend-request`)
         .send({ userId: testUserId2 });
 
       // Get notifications to get their IDs
@@ -185,33 +185,38 @@ describe('Notification System Tests', () => {
   });
 
   describe('Integration - Notification Creation', () => {
-    test('should create notifications when user follows another user', async () => {
-      // User2 follows User1
+    test('should create notifications when user sends friend request', async () => {
+      // User2 sends friend request to User1
       await request(app)
-        .post(`/api/users/${testUserId1}/follow`)
+        .post(`/api/users/${testUserId1}/friend-request`)
         .send({ userId: testUserId2 });
 
-      // Check if User1 received a follow notification
+      // Check if User1 received a friend request notification
       const response = await request(app)
         .get(`/api/notifications/${testUserId1}`);
 
       expect(response.status).toBe(200);
-      // Note: This depends on whether follow notifications are implemented
+      // Note: This depends on whether friend request notifications are implemented
       // If not implemented yet, this test documents the expected behavior
     });
 
-    test('should create notifications when posts are created for followers', async () => {
-      // User2 follows User1
+    test('should create notifications when posts are created for friends', async () => {
+      // User2 sends friend request to User1 and User1 accepts
       await request(app)
-        .post(`/api/users/${testUserId1}/follow`)
+        .post(`/api/users/${testUserId1}/friend-request`)
         .send({ userId: testUserId2 });
+
+      await request(app)
+        .post(`/api/users/${testUserId2}/accept-friend`)
+        .send({ userId: testUserId1 });
 
       // User1 creates a post
       await request(app)
         .post('/api/posts')
         .send({
-          rawText: 'Hello followers!',
-          userId: testUserId1
+          rawText: 'Hello friends!',
+          userId: testUserId1,
+          audienceType: 'friends'
         });
 
       // Check if User2 received a post notification

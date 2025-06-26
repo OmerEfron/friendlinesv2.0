@@ -31,6 +31,10 @@ const initializeDatabase = async () => {
           id TEXT PRIMARY KEY,
           fullName TEXT NOT NULL,
           email TEXT UNIQUE NOT NULL,
+          bio TEXT,
+          location TEXT,
+          website TEXT,
+          avatar TEXT,
           createdAt TEXT NOT NULL,
           updatedAt TEXT NOT NULL,
           friends TEXT DEFAULT '[]',
@@ -50,10 +54,9 @@ const initializeDatabase = async () => {
           updatedAt TEXT NOT NULL,
           groupIds TEXT DEFAULT '[]',
           visibility TEXT DEFAULT 'public',
-          likes TEXT DEFAULT '[]',
-          comments TEXT DEFAULT '[]',
-          likesCount INTEGER DEFAULT 0,
-          commentsCount INTEGER DEFAULT 0,
+          audienceType TEXT DEFAULT 'public',
+          targetFriendId TEXT,
+
           sharesCount INTEGER DEFAULT 0,
           FOREIGN KEY (userId) REFERENCES users(id)
         );
@@ -137,7 +140,7 @@ const rowToJson = (row, tableName) => {
   // Convert JSON string fields back to objects/arrays
   const jsonFields = {
     users: ['friends', 'friendRequests', 'sentFriendRequests'],
-    posts: ['likes', 'comments', 'groupIds'],
+    posts: ['groupIds'],
     groups: ['members', 'invites', 'settings'],
     notifications: ['data']
   };
@@ -175,7 +178,7 @@ const jsonToRow = (obj, tableName) => {
   // Convert arrays/objects to JSON strings
   const jsonFields = {
     users: ['friends', 'friendRequests', 'sentFriendRequests'],
-    posts: ['likes', 'comments', 'groupIds'],
+    posts: ['groupIds'],
     groups: ['members', 'invites', 'settings'],
     notifications: ['data']
   };
@@ -360,6 +363,187 @@ const initializeDataFiles = async () => {
   // For database, we just ensure tables exist (already done in initializeDatabase)
   // But we can run migration if JSON files exist
   await migrateFromJsonFiles();
+  
+  // Run database migrations
+  await runDatabaseMigrations();
+};
+
+/**
+ * Run database migrations for schema updates
+ * @returns {Promise<void>}
+ */
+const runDatabaseMigrations = async () => {
+  return new Promise((resolve, reject) => {
+    if (!db) {
+      reject(new Error('Database not initialized'));
+      return;
+    }
+    
+    // Check if new columns exist in users table
+    db.all("PRAGMA table_info(users)", (err, userColumns) => {
+      if (err) {
+        console.error('Error getting users table columns:', err);
+        reject(err);
+        return;
+      }
+      
+      // Check if new columns exist in posts table
+      db.all("PRAGMA table_info(posts)", (err, postColumns) => {
+        if (err) {
+          console.error('Error getting posts table columns:', err);
+          reject(err);
+          return;
+        }
+        
+        const hasAudienceType = postColumns.some(col => col.name === 'audienceType');
+        const hasTargetFriendId = postColumns.some(col => col.name === 'targetFriendId');
+        
+        // Check for new user fields
+        const hasBio = userColumns.some(col => col.name === 'bio');
+        const hasLocation = userColumns.some(col => col.name === 'location');
+        const hasWebsite = userColumns.some(col => col.name === 'website');
+        const hasAvatar = userColumns.some(col => col.name === 'avatar');
+        const hasExpoPushToken = userColumns.some(col => col.name === 'expoPushToken');
+        
+        let migrationsNeeded = 0;
+        let migrationsCompleted = 0;
+        
+        const runNextMigration = () => {
+          if (migrationsCompleted === migrationsNeeded) {
+            console.log('All database migrations completed');
+            resolve();
+            return;
+          }
+        };
+        
+        // User table migrations
+        if (!hasBio) {
+          migrationsNeeded++;
+          console.log('Adding bio column to users table...');
+          db.run("ALTER TABLE users ADD COLUMN bio TEXT", (err) => {
+            if (err) {
+              console.error('Error adding bio column:', err);
+              reject(err);
+            } else {
+              console.log('Successfully added bio column to users table');
+              migrationsCompleted++;
+              runNextMigration();
+            }
+          });
+        } else {
+          console.log('bio column already exists in users table');
+        }
+        
+        if (!hasLocation) {
+          migrationsNeeded++;
+          console.log('Adding location column to users table...');
+          db.run("ALTER TABLE users ADD COLUMN location TEXT", (err) => {
+            if (err) {
+              console.error('Error adding location column:', err);
+              reject(err);
+            } else {
+              console.log('Successfully added location column to users table');
+              migrationsCompleted++;
+              runNextMigration();
+            }
+          });
+        } else {
+          console.log('location column already exists in users table');
+        }
+        
+        if (!hasWebsite) {
+          migrationsNeeded++;
+          console.log('Adding website column to users table...');
+          db.run("ALTER TABLE users ADD COLUMN website TEXT", (err) => {
+            if (err) {
+              console.error('Error adding website column:', err);
+              reject(err);
+            } else {
+              console.log('Successfully added website column to users table');
+              migrationsCompleted++;
+              runNextMigration();
+            }
+          });
+        } else {
+          console.log('website column already exists in users table');
+        }
+        
+        if (!hasAvatar) {
+          migrationsNeeded++;
+          console.log('Adding avatar column to users table...');
+          db.run("ALTER TABLE users ADD COLUMN avatar TEXT", (err) => {
+            if (err) {
+              console.error('Error adding avatar column:', err);
+              reject(err);
+            } else {
+              console.log('Successfully added avatar column to users table');
+              migrationsCompleted++;
+              runNextMigration();
+            }
+          });
+        } else {
+          console.log('avatar column already exists in users table');
+        }
+        
+        if (!hasExpoPushToken) {
+          migrationsNeeded++;
+          console.log('Adding expoPushToken column to users table...');
+          db.run("ALTER TABLE users ADD COLUMN expoPushToken TEXT", (err) => {
+            if (err) {
+              console.error('Error adding expoPushToken column:', err);
+              reject(err);
+            } else {
+              console.log('Successfully added expoPushToken column to users table');
+              migrationsCompleted++;
+              runNextMigration();
+            }
+          });
+        } else {
+          console.log('expoPushToken column already exists in users table');
+        }
+        
+        // Posts table migrations
+        if (!hasAudienceType) {
+          migrationsNeeded++;
+          console.log('Adding audienceType column to posts table...');
+          db.run("ALTER TABLE posts ADD COLUMN audienceType TEXT DEFAULT 'public'", (err) => {
+            if (err) {
+              console.error('Error adding audienceType column:', err);
+              reject(err);
+            } else {
+              console.log('Successfully added audienceType column to posts table');
+              migrationsCompleted++;
+              runNextMigration();
+            }
+          });
+        } else {
+          console.log('audienceType column already exists in posts table');
+        }
+        
+        if (!hasTargetFriendId) {
+          migrationsNeeded++;
+          console.log('Adding targetFriendId column to posts table...');
+          db.run("ALTER TABLE posts ADD COLUMN targetFriendId TEXT", (err) => {
+            if (err) {
+              console.error('Error adding targetFriendId column:', err);
+              reject(err);
+            } else {
+              console.log('Successfully added targetFriendId column to posts table');
+              migrationsCompleted++;
+              runNextMigration();
+            }
+          });
+        } else {
+          console.log('targetFriendId column already exists in posts table');
+        }
+        
+        // If no migrations needed, resolve immediately
+        if (migrationsNeeded === 0) {
+          resolve();
+        }
+      });
+    });
+  });
 };
 
 module.exports = {

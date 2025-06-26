@@ -14,15 +14,7 @@ const getUserNotifications = async (req, res, next) => {
       });
     }
 
-    const pagination = validatePaginationParams({ page, limit });
-    if (!pagination.isValid) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid pagination parameters',
-        errors: pagination.errors,
-        timestamp: new Date().toISOString()
-      });
-    }
+    const { page: validatedPage, limit: validatedLimit } = validatePaginationParams(req.query);
 
     // Initialize notifications file if it doesn't exist
     let notifications;
@@ -38,30 +30,30 @@ const getUserNotifications = async (req, res, next) => {
 
     // Filter for unread only if requested
     if (unreadOnly === 'true') {
-      userNotifications = userNotifications.filter(notif => !notif.isRead);
+      userNotifications = userNotifications.filter(notif => !notif.read);
     }
 
     // Sort by creation date (newest first)
     userNotifications.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
     // Implement pagination
-    const startIndex = (pagination.page - 1) * pagination.limit;
-    const endIndex = startIndex + pagination.limit;
+    const startIndex = (validatedPage - 1) * validatedLimit;
+    const endIndex = startIndex + validatedLimit;
     const paginatedNotifications = userNotifications.slice(startIndex, endIndex);
 
-    const totalPages = Math.ceil(userNotifications.length / pagination.limit);
+    const totalPages = Math.ceil(userNotifications.length / validatedLimit);
 
     res.status(200).json({
       success: true,
       message: 'Notifications retrieved successfully',
       data: paginatedNotifications,
       pagination: {
-        page: pagination.page,
-        limit: pagination.limit,
+        page: validatedPage,
+        limit: validatedLimit,
         totalNotifications: userNotifications.length,
         totalPages,
-        hasNextPage: pagination.page < totalPages,
-        hasPrevPage: pagination.page > 1
+        hasNextPage: validatedPage < totalPages,
+        hasPrevPage: validatedPage > 1
       },
       timestamp: new Date().toISOString()
     });
@@ -103,7 +95,7 @@ const markNotificationsAsRead = async (req, res, next) => {
     notifications = notifications.map(notif => {
       if (notificationIds.includes(notif.id) && notif.userId === userId) {
         markedCount++;
-        return { ...notif, isRead: true };
+        return { ...notif, read: true };
       }
       return notif;
     });
@@ -142,7 +134,7 @@ const createNotification = async (userId, type, title, message, data = {}) => {
       title,
       message,
       data,
-      isRead: false,
+      read: false,
       createdAt: new Date().toISOString()
     };
 

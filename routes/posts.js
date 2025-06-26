@@ -13,12 +13,8 @@ const {
   deletePost,
   getPostById,
   getPostStats,
-  likePost,
-  getLikes,
-  addComment,
-  getComments,
-  deleteComment,
   generateNewsflashPreview,
+  getAllPostsDev,
 } = require("../controllers/postController");
 
 // Import middleware
@@ -41,137 +37,46 @@ router.use(getGeneralLimiter());
 
 /**
  * GET /posts
- * Get all posts (newsflashes) with pagination
- * Query params: page, limit
+ * Get all posts with pagination and audience filtering
+ * Query params: page, limit, currentUserId
  */
-router.get(
-  "/",
-  getAllPosts // Controller function
-);
+router.get("/", getAllPosts);
 
 /**
- * GET /posts/stats
- * Get post statistics (development only)
- * Must be defined before /:userId route to avoid conflicts
+ * GET /posts/dev
+ * Get all posts (development only - no pagination, no filtering)
  */
-router.get(
-  "/stats",
-  getPostStats // Controller function (checks NODE_ENV internally)
-);
-
-/**
- * POST /posts/generate-newsflash
- * Generate a newsflash preview using GPT (without creating a post)
- * Body: { rawText, userId, tone?, length?, temperature? }
- */
-router.post(
-  "/generate-newsflash",
-  validateContentType, // Ensure JSON content type
-  ensureBodyExists, // Ensure request body exists
-  generateNewsflashPreview // Controller function
-);
-
-/**
- * GET /posts/single/:id
- * Get a specific post by ID
- * Must be defined before /:userId route to avoid conflicts
- */
-router.get(
-  "/single/:id",
-  validateIdMiddleware("id"), // Validate post ID parameter
-  getPostById // Controller function
-);
-
-/**
- * POST /posts/:id/like
- * Toggle like on a post
- * Body: { userId }
- */
-router.post(
-  "/:id/like",
-  validateIdMiddleware("id"), // Validate post ID parameter
-  validateContentType, // Ensure JSON content type
-  ensureBodyExists, // Ensure request body exists
-  likePost // Controller function
-);
-
-/**
- * GET /posts/:id/likes
- * Get likes for a post
- */
-router.get(
-  "/:id/likes",
-  validateIdMiddleware("id"), // Validate post ID parameter
-  getLikes // Controller function
-);
-
-/**
- * POST /posts/:id/comments
- * Add a comment to a post
- * Body: { userId, text }
- */
-router.post(
-  "/:id/comments",
-  validateIdMiddleware("id"), // Validate post ID parameter
-  validateContentType, // Ensure JSON content type
-  ensureBodyExists, // Ensure request body exists
-  addComment // Controller function
-);
-
-/**
- * GET /posts/:id/comments
- * Get comments for a post
- * Query params: page, limit
- */
-router.get(
-  "/:id/comments",
-  validateIdMiddleware("id"), // Validate post ID parameter
-  getComments // Controller function
-);
-
-/**
- * DELETE /posts/:postId/comments/:commentId
- * Delete a comment from a post
- * Body: { userId }
- */
-router.delete(
-  "/:postId/comments/:commentId",
-  validateIdMiddleware("postId"), // Validate post ID parameter
-  validateIdMiddleware("commentId"), // Validate comment ID parameter
-  validateContentType, // Ensure JSON content type
-  ensureBodyExists, // Ensure request body exists
-  deleteComment // Controller function
-);
+router.get("/dev", getAllPostsDev);
 
 /**
  * GET /posts/:userId
- * Get posts by specific user with pagination
- * Query params: page, limit
+ * Get posts by user with pagination and audience filtering
+ * Query params: page, limit, currentUserId, includeFriends
  */
 router.get(
   "/:userId",
-  validateUserIdMiddleware, // Validate user ID parameter
+  validateIdMiddleware("userId"), // Validate user ID parameter
   getPostsByUser // Controller function
 );
 
 /**
  * POST /posts
- * Create a new post with generated newsflash
- * Body: { rawText, userId }
+ * Create a new post
+ * Body: { rawText, userId, audienceType, targetFriendId?, groupIds?, generate?, tone?, length?, temperature? }
  */
 router.post(
   "/",
   postCreationLimiter, // Rate limiting for post creation
   validateContentType, // Ensure JSON content type
   ensureBodyExists, // Ensure request body exists
-  validatePostMiddleware, // Validate and sanitize post data
+  validatePostMiddleware, // Validate post data
   createPost // Controller function
 );
 
 /**
  * PUT /posts/:id
- * Update an existing post (regenerates newsflash)
- * Body: { rawText }
+ * Update an existing post
+ * Body: { rawText?, generate?, tone?, length?, temperature? }
  */
 router.put(
   "/:id",
@@ -179,54 +84,54 @@ router.put(
   validateIdMiddleware("id"), // Validate post ID parameter
   validateContentType, // Ensure JSON content type
   ensureBodyExists, // Ensure request body exists
-  validatePostUpdateMiddleware, // Validate and sanitize update data
+  validatePostUpdateMiddleware, // Validate update data
   updatePost // Controller function
 );
 
 /**
  * DELETE /posts/:id
  * Delete a post
+ * Body: { userId }
  */
 router.delete(
   "/:id",
   validateIdMiddleware("id"), // Validate post ID parameter
+  validateContentType, // Ensure JSON content type
+  ensureBodyExists, // Ensure request body exists
   deletePost // Controller function
 );
 
-// Error handling middleware for post routes
-router.use((error, req, res, next) => {
-  console.error("Posts route error:", error);
+/**
+ * GET /posts/:id/details
+ * Get a specific post by ID with user info and stats
+ */
+router.get(
+  "/:id/details",
+  validateIdMiddleware("id"), // Validate post ID parameter
+  getPostById // Controller function
+);
 
-  // Check if it's a validation error
-  if (error.name === "ValidationError") {
-    return res.status(400).json({
-      success: false,
-      message: "Validation failed",
-      error: error.message,
-      timestamp: new Date().toISOString(),
-    });
-  }
+/**
+ * GET /posts/:id/stats
+ * Get statistics for a specific post
+ */
+router.get(
+  "/:id/stats",
+  validateIdMiddleware("id"), // Validate post ID parameter
+  getPostStats // Controller function
+);
 
-  // Check if it's a newsflash generation error
-  if (error.message && error.message.includes("newsflash")) {
-    return res.status(400).json({
-      success: false,
-      message: "Newsflash generation failed",
-      error: error.message,
-      timestamp: new Date().toISOString(),
-    });
-  }
-
-  // General server error
-  res.status(500).json({
-    success: false,
-    message: "Internal server error in posts",
-    error:
-      process.env.NODE_ENV === "development"
-        ? error.message
-        : "Something went wrong",
-    timestamp: new Date().toISOString(),
-  });
-});
+/**
+ * POST /posts/preview
+ * Generate a newsflash preview without saving the post
+ * Body: { rawText, tone?, length?, temperature? }
+ */
+router.post(
+  "/preview",
+  postCreationLimiter, // Use same rate limit as post creation
+  validateContentType, // Ensure JSON content type
+  ensureBodyExists, // Ensure request body exists
+  generateNewsflashPreview // Controller function
+);
 
 module.exports = router;

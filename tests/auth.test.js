@@ -41,10 +41,10 @@ describe('Authentication Endpoints', () => {
         email: 'alice@friendlines.com',
         createdAt: '2025-06-10T08:00:00.000Z',
         updatedAt: '2025-06-17T10:30:00.000Z',
-        followers: ['u1737582951002def'],
-        following: ['u1737582951002def'],
-        followersCount: 1,
-        followingCount: 1,
+        friends: ['u1737582951002def'],
+        friendRequests: [],
+        sentFriendRequests: [],
+        friendsCount: 1,
         expoPushToken: 'ExponentPushToken[alice_token_12345]'
       }
     ];
@@ -82,8 +82,7 @@ describe('Authentication Endpoints', () => {
       expect(response.body.data.id).toBe('u1737582951001abc');
       expect(response.body.data.fullName).toBe('Alice Johnson');
       expect(response.body.data.email).toBe('alice@friendlines.com');
-      expect(response.body.data.followersCount).toBe(1);
-      expect(response.body.data.followingCount).toBe(1);
+      expect(response.body.data.friendsCount).toBe(1);
     });
 
     test('should create new user when not exists', async () => {
@@ -101,8 +100,7 @@ describe('Authentication Endpoints', () => {
       expect(response.body.message).toBe('User created and logged in successfully');
       expect(response.body.data.fullName).toBe('Bob Smith');
       expect(response.body.data.email).toBe('bob@friendlines.com');
-      expect(response.body.data.followersCount).toBe(0);
-      expect(response.body.data.followingCount).toBe(0);
+      expect(response.body.data.friendsCount).toBe(0);
       expect(response.body.data.id).toMatch(/^u/);
     });
 

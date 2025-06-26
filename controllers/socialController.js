@@ -150,7 +150,7 @@ const getFriendSuggestions = async (req, res, next) => {
   }
 };
 
-const bulkFollowStatus = async (req, res, next) => {
+const bulkFriendshipStatus = async (req, res, next) => {
   try {
     const { userId, targetUserIds } = req.body;
 
@@ -226,5 +226,5 @@ const bulkFollowStatus = async (req, res, next) => {
 module.exports = {
   getMutualFriends,
   getFriendSuggestions,
-  bulkFollowStatus
+  bulkFriendshipStatus
 }; 

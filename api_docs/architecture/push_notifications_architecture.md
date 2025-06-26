@@ -29,6 +29,10 @@
 **Notification Triggers:**
 - **Public Posts**: Notify all followers of the post creator
 - **Group Posts**: Notify all group members (excluding creator)
+- **Group Invitations**: Notify invited users when they receive an invitation
+- **Group Invitation Acceptance**: Notify group owner when someone accepts an invitation
+- **Friend Requests**: Notify target user when they receive a friend request
+- **Friend Request Acceptance**: Notify requester when their friend request is accepted
 - **Batch Processing**: Handle up to 100 notifications per batch
 - **Error Handling**: Non-blocking delivery with graceful degradation
 
@@ -58,9 +62,31 @@
 - **Content**: Truncated post content (100 chars max)
 - **Deep Linking**: Post ID and user information included
 
+**Group Notifications:**
+- **Type**: `group_invitation` (when user is invited to group)
+- **Recipients**: Invited users
+- **Content**: Inviter name and group name
+- **Deep Linking**: Group ID and inviter information included
+
+- **Type**: `group_invitation_accepted` (when invitation is accepted)
+- **Recipients**: Group owner
+- **Content**: New member name and group name
+- **Deep Linking**: Group ID and new member information included
+
+**Friend Notifications:**
+- **Type**: `friend_request` (when friend request is sent)
+- **Recipients**: Target user
+- **Content**: Requester name
+- **Deep Linking**: Requester ID and name included
+
+- **Type**: `friend_request_accepted` (when friend request is accepted)
+- **Recipients**: Original requester
+- **Content**: Accepter name
+- **Deep Linking**: Accepter ID and name included
+
 **Delivery Logic:**
-- Smart recipient targeting based on post visibility
-- Creator exclusion (users don't get notified of their own posts)
+- Smart recipient targeting based on action type
+- Creator/requester exclusion (users don't get notified of their own actions)
 - Token deduplication for users in multiple groups
 - Rate limiting and cooldown periods
 
@@ -104,10 +130,14 @@
 
 The Push Notifications architecture enables real-time notifications for Friendlines users when:
 - ✅ Someone they follow creates a new post (IMPLEMENTED)
+- ✅ Someone invites them to join a group (IMPLEMENTED)
+- ✅ Someone accepts their group invitation (IMPLEMENTED)
+- ✅ Someone sends them a friend request (IMPLEMENTED)
+- ✅ Someone accepts their friend request (IMPLEMENTED)
 - A post is shared to a group they belong to (future extension)
 - Someone likes or comments on their post (future extension)
 
-**Current Status**: Core push notification functionality is fully implemented and integrated.
+**Current Status**: Core push notification functionality is fully implemented and integrated, including social interactions.
 
 ## Architecture
 
@@ -158,7 +188,21 @@ The Push Notifications architecture enables real-time notifications for Friendli
    - Proper notification payload with post metadata
    - Truncated notification body for better UX (100 chars max)
 
-2. ✅ **Error Handling Integration**:
+2. ✅ **Group Invitation Integration** (`controllers/groupController.js`):
+   - Added `sendPush()` and `getFriendTokens()` imports
+   - Integrated push notification sending when inviting users to groups
+   - Integrated push notification sending when users accept group invitations
+   - Non-blocking notification flow for both invitation and acceptance
+   - Proper notification payload with group and user metadata
+
+3. ✅ **Friend Request Integration** (`controllers/authController.js`):
+   - Added `sendPush()` and `getFriendTokens()` imports
+   - Integrated push notification sending when sending friend requests
+   - Integrated push notification sending when accepting friend requests
+   - Non-blocking notification flow for both request and acceptance
+   - Proper notification payload with user metadata
+
+4. ✅ **Error Handling Integration**:
    - Try-catch wrapper around notification logic
    - Graceful degradation if notifications fail
    - Comprehensive logging for debugging
