@@ -86,9 +86,8 @@ jobs:
     - name: 🏗️ Create build artifact
       run: |
         mkdir -p build
-        cp -r . build/
+        tar --exclude='./build' --exclude='./.git' --exclude='./.github' --exclude='./tests' --exclude='./docs' --exclude='./node_modules' -cf - . | tar -xf - -C build/
         cd build
-        rm -rf node_modules .git .github tests docs
         npm ci --production --silent
         
     - name: 📤 Upload build artifact
