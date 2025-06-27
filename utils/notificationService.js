@@ -1,11 +1,41 @@
-// Notification service for handling push notifications
-// Contains device registration and notification sending functionality
+// Enhanced notification service for handling push notifications
+// Follows Expo's best practices for reliable delivery and error handling
 
 const { Expo } = require('expo-server-sdk');
-const { readJson, writeJson } = require('./dbUtils');
+const { readJson, writeJson, generateId } = require('./dbUtils');
+const sqlite3 = require('sqlite3').verbose();
+const path = require('path');
 
 // Create Expo SDK instance
 const expo = new Expo();
+
+// Database connection for receipt tracking
+const dbPath = path.join(__dirname, '../data/friendlines.db');
+let db = null;
+
+// Initialize database connection
+const initializeReceiptDb = () => {
+  if (!db) {
+    db = new sqlite3.Database(dbPath, (err) => {
+      if (err) {
+        console.error('Error opening receipt tracking database:', err);
+      }
+    });
+  }
+};
+
+// Rate limiting configuration (600 notifications per second max)
+const RATE_LIMIT = {
+  maxPerSecond: 600,
+  queue: [],
+  lastProcessed: 0,
+  processing: false
+};
+
+// Receipt checking configuration
+const RECEIPT_CHECK_DELAY = 15 * 60 * 1000; // 15 minutes
+const MAX_RECEIPT_RETRIES = 3;
+const RECEIPT_CLEANUP_AFTER = 24 * 60 * 60 * 1000; // 24 hours
 
 /**
  * Validate Expo push token format
@@ -68,14 +98,56 @@ const registerDevice = async (userId, expoPushToken) => {
 };
 
 /**
- * Send push notifications to multiple devices
+ * Rate limited queue processor for notifications
+ */
+const processNotificationQueue = async () => {
+  if (RATE_LIMIT.processing || RATE_LIMIT.queue.length === 0) {
+    return;
+  }
+
+  RATE_LIMIT.processing = true;
+
+  while (RATE_LIMIT.queue.length > 0) {
+    const now = Date.now();
+    const timeSinceLastProcess = now - RATE_LIMIT.lastProcessed;
+    
+    // Ensure we don't exceed rate limit
+    if (timeSinceLastProcess < 1000) {
+      await new Promise(resolve => setTimeout(resolve, 1000 - timeSinceLastProcess));
+    }
+
+    // Process up to rate limit
+    const batch = RATE_LIMIT.queue.splice(0, Math.min(RATE_LIMIT.maxPerSecond, RATE_LIMIT.queue.length));
+    
+    for (const notificationTask of batch) {
+      try {
+        await sendPushImmediate(notificationTask);
+      } catch (error) {
+        console.error('Failed to process notification:', error);
+        // Add to retry queue if it hasn't exceeded max retries
+        if ((notificationTask.retryCount || 0) < 3) {
+          notificationTask.retryCount = (notificationTask.retryCount || 0) + 1;
+          RATE_LIMIT.queue.push(notificationTask);
+        }
+      }
+    }
+
+    RATE_LIMIT.lastProcessed = Date.now();
+  }
+
+  RATE_LIMIT.processing = false;
+};
+
+/**
+ * Send push notifications with rate limiting and retry logic
  * @param {string[]} tokens - Array of Expo push tokens
  * @param {string} title - Notification title
  * @param {string} body - Notification body
  * @param {Object} data - Additional data payload
- * @returns {Promise<{success: boolean, results?: any[], errors?: any[]}>}
+ * @param {Object} options - Additional notification options
+ * @returns {Promise<{success: boolean, tickets?: any[], errors?: any[]}>}
  */
-const sendPush = async (tokens, title, body, data = {}) => {
+const sendPush = async (tokens, title, body, data = {}, options = {}) => {
   try {
     // Filter out invalid tokens
     const validTokens = tokens.filter(token => isValidExpoPushToken(token));
@@ -87,106 +159,310 @@ const sendPush = async (tokens, title, body, data = {}) => {
       };
     }
 
-    // Create messages array
-    const messages = validTokens.map(token => ({
-      to: token,
+    // Add to rate-limited queue
+    const notificationTask = {
+      tokens: validTokens,
       title,
       body,
       data: {
         ...data,
         timestamp: new Date().toISOString()
       },
-      sound: 'default',
-      priority: 'high'
-    }));
+      options: {
+        sound: 'default',
+        priority: 'high',
+        channelId: options.channelId || 'default',
+        ...options
+      },
+      retryCount: 0
+    };
 
-    // Send notifications in chunks of 100 (Expo's limit)
-    const chunks = expo.chunkPushNotifications(messages);
-    const results = [];
-    const errors = [];
-
-    for (const chunk of chunks) {
-      try {
-        const ticketChunk = await expo.sendPushNotificationsAsync(chunk);
-        results.push(...ticketChunk);
-        
-        // Log successful sends
-        console.log(`Sent ${chunk.length} push notifications`);
-      } catch (error) {
-        console.error('Error sending notification chunk:', error);
-        errors.push(error);
-      }
-    }
-
-    // Handle any invalid tokens or errors from the results
-    await handlePushErrors(results);
+    RATE_LIMIT.queue.push(notificationTask);
+    
+    // Start processing queue
+    processNotificationQueue();
 
     return {
       success: true,
-      results,
-      errors: errors.length > 0 ? errors : undefined
+      message: `${validTokens.length} notifications queued for delivery`
     };
   } catch (error) {
     console.error('Error in sendPush:', error);
     return {
       success: false,
-      error: 'Failed to send push notifications'
+      error: 'Failed to queue push notifications'
     };
   }
 };
 
 /**
- * Handle push notification errors and remove invalid tokens
- * @param {Array} results - Results from expo.sendPushNotificationsAsync
+ * Immediate push notification sending (internal use)
+ * @param {Object} notificationTask - The notification task to process
  */
-const handlePushErrors = async (results) => {
+const sendPushImmediate = async (notificationTask) => {
+  const { tokens, title, body, data, options } = notificationTask;
+  
   try {
-    const invalidTokens = [];
-    
-    // Check for errors in results
-    results.forEach((result, index) => {
-      if (result.status === 'error') {
-        console.error(`Push notification error:`, result);
+    // Create messages array
+    const messages = tokens.map(token => ({
+      to: token,
+      title,
+      body,
+      data,
+      sound: options.sound || 'default',
+      priority: options.priority || 'high',
+      channelId: options.channelId || 'default',
+      badge: options.badge,
+      ttl: options.ttl,
+      expiration: options.expiration,
+      mutableContent: options.mutableContent || false,
+      categoryId: options.categoryId
+    }));
+
+    // Send notifications in chunks of 100 (Expo's limit)
+    const chunks = expo.chunkPushNotifications(messages);
+    const allTickets = [];
+
+    for (const chunk of chunks) {
+      try {
+        const tickets = await expo.sendPushNotificationsAsync(chunk);
+        allTickets.push(...tickets);
         
-        // Check if the error is due to invalid token
-        if (result.details && result.details.error === 'DeviceNotRegistered') {
-          // We would need the original token to remove it
-          // For now, just log it
-          console.log('Device not registered error detected');
+        console.log(`Sent ${chunk.length} push notifications`);
+      } catch (error) {
+        console.error('Error sending notification chunk:', error);
+        
+        // Exponential backoff for retries
+        if (notificationTask.retryCount < 3) {
+          const delay = Math.pow(2, notificationTask.retryCount) * 1000;
+          await new Promise(resolve => setTimeout(resolve, delay));
+          throw error; // Will be caught by queue processor for retry
         }
       }
+    }
+
+    // Store tickets for receipt checking
+    await storeTicketsForReceiptCheck(allTickets, data.type || 'unknown');
+
+    return {
+      success: true,
+      tickets: allTickets
+    };
+  } catch (error) {
+    console.error('Error in sendPushImmediate:', error);
+    throw error;
+  }
+};
+
+/**
+ * Store notification tickets for later receipt checking
+ * @param {Array} tickets - Array of push notification tickets
+ * @param {string} notificationType - Type of notification for tracking
+ */
+const storeTicketsForReceiptCheck = async (tickets, notificationType) => {
+  try {
+    initializeReceiptDb();
+
+    const validTickets = tickets.filter(ticket => 
+      ticket.status === 'ok' && ticket.id
+    );
+
+    if (validTickets.length === 0) return;
+
+    const now = new Date().toISOString();
+    const checkAfter = new Date(Date.now() + RECEIPT_CHECK_DELAY).toISOString();
+
+    // Insert receipts into database
+    const stmt = db.prepare(`
+      INSERT OR IGNORE INTO push_receipts 
+      (id, ticketId, notificationType, createdAt, checkAfter, retryCount)
+      VALUES (?, ?, ?, ?, ?, 0)
+    `);
+
+    for (const ticket of validTickets) {
+      const receiptId = generateId('pr');
+      stmt.run(receiptId, ticket.id, notificationType, now, checkAfter);
+    }
+
+    stmt.finalize();
+    console.log(`Stored ${validTickets.length} tickets for receipt checking`);
+  } catch (error) {
+    console.error('Error storing tickets for receipt check:', error);
+  }
+};
+
+/**
+ * Check push notification receipts and handle errors
+ * Should be called periodically (e.g., every 30 minutes)
+ */
+const checkPushReceipts = async () => {
+  try {
+    initializeReceiptDb();
+
+    const now = new Date().toISOString();
+    
+    // Get receipts ready to check from database
+    const readyToCheck = await new Promise((resolve, reject) => {
+      db.all(
+        `SELECT * FROM push_receipts 
+         WHERE checkAfter <= ? AND retryCount < ? AND status = 'pending'
+         ORDER BY createdAt ASC`,
+        [now, MAX_RECEIPT_RETRIES],
+        (err, rows) => {
+          if (err) reject(err);
+          else resolve(rows);
+        }
+      );
     });
 
-    // If we have invalid tokens, we could remove them from user records
-    // This would require keeping track of which tokens correspond to which results
-    // For now, we'll implement basic logging
-    if (invalidTokens.length > 0) {
-      console.log(`Found ${invalidTokens.length} invalid tokens to clean up`);
+    if (readyToCheck.length === 0) {
+      // Clean up old receipts (older than 24 hours)
+      const cutoff = new Date(Date.now() - RECEIPT_CLEANUP_AFTER).toISOString();
+      await new Promise((resolve, reject) => {
+        db.run(
+          'DELETE FROM push_receipts WHERE createdAt < ?',
+          [cutoff],
+          function(err) {
+            if (err) reject(err);
+            else {
+              if (this.changes > 0) {
+                console.log(`Cleaned up ${this.changes} old receipts`);
+              }
+              resolve();
+            }
+          }
+        );
+      });
+      return;
     }
+
+    console.log(`Checking ${readyToCheck.length} push notification receipts`);
+
+    // Check receipts in batches of 1000 (Expo's limit)
+    const batchSize = 1000;
+    const invalidTokens = [];
+    const processedIds = [];
+
+    for (let i = 0; i < readyToCheck.length; i += batchSize) {
+      const batch = readyToCheck.slice(i, i + batchSize);
+      const receiptIds = batch.map(r => r.ticketId);
+
+      try {
+        const receipts = await expo.getPushNotificationReceiptsAsync(receiptIds);
+        
+        for (const receiptId in receipts) {
+          const receipt = receipts[receiptId];
+          const dbReceipt = batch.find(r => r.ticketId === receiptId);
+          
+          if (dbReceipt) {
+            processedIds.push(dbReceipt.id);
+
+            if (receipt.status === 'error') {
+              console.error(`Push receipt error for ${receiptId}:`, receipt);
+              
+              // Update database with error
+              await new Promise((resolve, reject) => {
+                db.run(
+                  `UPDATE push_receipts 
+                   SET status = 'error', errorMessage = ?, errorDetails = ?
+                   WHERE id = ?`,
+                  [receipt.message || 'Unknown error', JSON.stringify(receipt.details || {}), dbReceipt.id],
+                  (err) => {
+                    if (err) reject(err);
+                    else resolve();
+                  }
+                );
+              });
+              
+              if (receipt.details && receipt.details.error === 'DeviceNotRegistered') {
+                console.log('Device not registered - token should be removed');
+                // We could implement token removal here if we track token-to-receipt mapping
+              }
+            } else if (receipt.status === 'ok') {
+              console.log(`Push notification ${receiptId} delivered successfully`);
+              
+              // Update database with success
+              await new Promise((resolve, reject) => {
+                db.run(
+                  `UPDATE push_receipts 
+                   SET status = 'delivered', deliveredAt = ?
+                   WHERE id = ?`,
+                  [new Date().toISOString(), dbReceipt.id],
+                  (err) => {
+                    if (err) reject(err);
+                    else resolve();
+                  }
+                );
+              });
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error checking push receipts batch:', error);
+        
+        // Mark batch for retry with exponential backoff
+        const retryAfter = new Date(Date.now() + Math.pow(2, batch[0].retryCount) * 60000).toISOString();
+        
+        for (const receipt of batch) {
+          await new Promise((resolve, reject) => {
+            db.run(
+              `UPDATE push_receipts 
+               SET retryCount = retryCount + 1, checkAfter = ?
+               WHERE id = ?`,
+              [retryAfter, receipt.id],
+              (err) => {
+                if (err) reject(err);
+                else resolve();
+              }
+            );
+          });
+        }
+        continue;
+      }
+    }
+
+    // Clean up invalid tokens if any were found
+    if (invalidTokens.length > 0) {
+      await removeInvalidTokens(invalidTokens);
+    }
+
+    console.log(`Receipt check complete. Processed: ${processedIds.length}`);
   } catch (error) {
-    console.error('Error handling push errors:', error);
+    console.error('Error in checkPushReceipts:', error);
   }
 };
 
 /**
  * Get group members' push tokens for a group
- * @param {string} groupId - The group ID whose members we want to notify
+ * @param {string|string[]} groupIds - The group ID(s) whose members we want to notify
+ * @param {string} excludeUserId - User ID to exclude from notifications (usually the creator)
  * @returns {Promise<string[]>} Array of push tokens
  */
-const getGroupMembersTokens = async (groupId) => {
+const getGroupMembersTokens = async (groupIds, excludeUserId = null) => {
   try {
     const groups = await readJson('groups');
     const users = await readJson('users');
     
-    const group = groups.find(g => g.id === groupId);
-    if (!group || !group.members) {
-      return [];
+    const groupIdArray = Array.isArray(groupIds) ? groupIds : [groupIds];
+    const allMemberIds = new Set();
+    
+    // Collect all unique member IDs from specified groups
+    for (const groupId of groupIdArray) {
+      const group = groups.find(g => g.id === groupId);
+      if (group && group.members) {
+        group.members.forEach(memberId => {
+          if (memberId !== excludeUserId) {
+            allMemberIds.add(memberId);
+          }
+        });
+      }
     }
     
-    // Get tokens for all group members
+    // Get tokens for all unique members
     const memberTokens = users
-      .filter(u => group.members.includes(u.id) && u.expoPushToken)
-      .map(u => u.expoPushToken);
+      .filter(u => allMemberIds.has(u.id) && u.expoPushToken)
+      .map(u => u.expoPushToken)
+      .filter(token => isValidExpoPushToken(token));
     
     return memberTokens;
   } catch (error) {
@@ -278,6 +554,19 @@ const removeInvalidTokens = async (invalidTokens) => {
   }
 };
 
+/**
+ * Initialize periodic receipt checking
+ * Should be called on server startup
+ */
+const initializeReceiptChecking = () => {
+  // Initialize database connection
+  initializeReceiptDb();
+  
+  // Check receipts every 30 minutes
+  setInterval(checkPushReceipts, 30 * 60 * 1000);
+  console.log('Push notification receipt checking initialized');
+};
+
 module.exports = {
   registerDevice,
   sendPush,
@@ -285,5 +574,7 @@ module.exports = {
   getGroupMembersTokens,
   getFriendTokens,
   removeInvalidTokens,
-  isValidExpoPushToken
+  isValidExpoPushToken,
+  checkPushReceipts,
+  initializeReceiptChecking
 }; 

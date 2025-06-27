@@ -414,6 +414,10 @@ const sendFriendRequest = async (req, res) => {
             requesterName: currentUser.fullName,
             targetUserId: id,
             targetUserName: targetUser.fullName
+          },
+          {
+            channelId: "friend_requests",
+            priority: "normal"
           }
         );
         
@@ -552,6 +556,10 @@ const acceptFriendRequest = async (req, res) => {
             accepterName: currentUser.fullName,
             requesterId: id,
             requesterName: requesterUser.fullName
+          },
+          {
+            channelId: "friend_requests",
+            priority: "normal"
           }
         );
         

@@ -87,6 +87,20 @@ const initializeDatabase = async () => {
           createdAt TEXT NOT NULL,
           FOREIGN KEY (userId) REFERENCES users(id)
         );
+        
+        -- Push notification receipts table for tracking delivery
+        CREATE TABLE IF NOT EXISTS push_receipts (
+          id TEXT PRIMARY KEY,
+          ticketId TEXT NOT NULL UNIQUE,
+          notificationType TEXT NOT NULL,
+          status TEXT DEFAULT 'pending',
+          errorMessage TEXT,
+          errorDetails TEXT,
+          deliveredAt TEXT,
+          createdAt TEXT NOT NULL,
+          checkAfter TEXT NOT NULL,
+          retryCount INTEGER DEFAULT 0
+        );
       `;
       
       db.exec(createTables, (err) => {
@@ -321,50 +335,11 @@ const generateId = (prefix = '') => {
 };
 
 /**
- * Migrate existing JSON data to SQLite database
- * @returns {Promise<void>}
- */
-const migrateFromJsonFiles = async () => {
-  const fs = require('fs').promises;
-  const dataDir = path.join(__dirname, '../data');
-  
-  const files = ['users.json', 'posts.json', 'groups.json', 'notifications.json'];
-  
-  for (const file of files) {
-    const filePath = path.join(dataDir, file);
-    
-    try {
-      const data = await fs.readFile(filePath, 'utf8');
-      const jsonData = JSON.parse(data);
-      
-      if (Array.isArray(jsonData) && jsonData.length > 0) {
-        console.log(`Migrating ${jsonData.length} records from ${file}`);
-        await writeJson(file, jsonData);
-      } else {
-        console.log(`No data to migrate from ${file}`);
-      }
-    } catch (error) {
-      if (error.code === 'ENOENT') {
-        console.log(`File ${file} does not exist, skipping migration`);
-      } else {
-        console.error(`Error migrating ${file}:`, error);
-      }
-    }
-  }
-  
-  console.log('Migration completed');
-};
-
-/**
  * Initialize data files/tables with default empty data (maintains fileUtils interface)
  * @returns {Promise<void>}
  */
 const initializeDataFiles = async () => {
-  // For database, we just ensure tables exist (already done in initializeDatabase)
-  // But we can run migration if JSON files exist
-  await migrateFromJsonFiles();
-  
-  // Run database migrations
+  // Only run database migrations
   await runDatabaseMigrations();
 };
 
@@ -553,5 +528,5 @@ module.exports = {
   writeJson,
   generateId,
   initializeDataFiles,
-  migrateFromJsonFiles
+  runDatabaseMigrations
 }; 

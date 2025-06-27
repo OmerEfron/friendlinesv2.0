@@ -7,6 +7,7 @@ const helmet = require("helmet");
 const path = require("path");
 const { initializeDatabase, initializeDataFiles, closeDatabase } = require("./utils/dbUtils");
 const { initializeDevData } = require("./utils/devDataInitializer");
+const { initializeReceiptChecking } = require("./utils/notificationService");
 const uploadRoutes = require('./routes/upload');
 const notificationRoutes = require('./routes/notifications');
 const socialRoutes = require('./routes/social');
@@ -276,6 +277,10 @@ const startServer = async () => {
       await initializeDevData();
       console.log("✅ Development data initialized");
     }
+
+    // Initialize notification receipt checking
+    initializeReceiptChecking();
+    console.log("✅ Notification receipt checking initialized");
 
     // Start server
     const server = app.listen(PORT, () => {

@@ -487,7 +487,7 @@ const createPost = async (req, res) => {
       let recipientTokens = [];
       
       if (finalAudienceType === "groups" && groupIds && groupIds.length > 0) {
-        // Group post - notify group members
+        // Group post - notify group members (excluding the post creator)
         recipientTokens = await getGroupMembersTokens(groupIds, userId);
         if (recipientTokens.length > 0) {
           const notificationResult = await sendPush(
@@ -500,6 +500,10 @@ const createPost = async (req, res) => {
               userId: userId,
               userFullName: user.fullName,
               groupIds: groupIds
+            },
+            {
+              channelId: "group_posts",
+              priority: "high"
             }
           );
           
@@ -522,6 +526,10 @@ const createPost = async (req, res) => {
               postId: newPost.id,
               userId: userId,
               userFullName: user.fullName
+            },
+            {
+              channelId: "friends_posts",
+              priority: "high"
             }
           );
           
@@ -545,6 +553,10 @@ const createPost = async (req, res) => {
               userId: userId,
               userFullName: user.fullName,
               targetFriendId: targetFriendId
+            },
+            {
+              channelId: "personal_posts",
+              priority: "high"
             }
           );
           

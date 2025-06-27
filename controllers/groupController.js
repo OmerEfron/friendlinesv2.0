@@ -162,6 +162,10 @@ const inviteToGroup = async (req, res) => {
               inviterId: userId,
               inviterName: inviter.fullName,
               invitedUserId: inviteUserId
+            },
+            {
+              channelId: "group_invitations",
+              priority: "normal"
             }
           );
           
@@ -273,6 +277,10 @@ const acceptInvitation = async (req, res) => {
             newMemberId: userId,
             newMemberName: acceptingUser.fullName,
             ownerId: group.ownerId
+          },
+          {
+            channelId: "group_invitations",
+            priority: "normal"
           }
         );
         
