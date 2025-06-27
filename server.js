@@ -1,6 +1,9 @@
 // Main server entry point for Friendlines Backend
 // This file will initialize Express server and configure routes
 
+// Load environment variables from .env file
+require('dotenv').config();
+
 const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");

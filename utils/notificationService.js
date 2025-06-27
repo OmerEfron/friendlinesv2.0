@@ -6,8 +6,11 @@ const { readJson, writeJson, generateId } = require('./dbUtils');
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 
-// Create Expo SDK instance
-const expo = new Expo();
+// Create Expo SDK instance with access token if available
+const expo = new Expo({
+  accessToken: process.env.EXPO_ACCESS_TOKEN,
+  useFcmV1: true // Use FCM V1 API
+});
 
 // Database connection for receipt tracking
 const dbPath = path.join(__dirname, '../data/friendlines.db');
