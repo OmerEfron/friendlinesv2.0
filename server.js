@@ -8,6 +8,8 @@ const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
 const path = require("path");
+const swaggerJsdoc = require('swagger-jsdoc');
+const swaggerUi = require('swagger-ui-express');
 const { db } = require("./utils/database");
 const { MigrationService } = require("./utils/migrationService");
 const { initializeDevData } = require("./utils/devDataInitializer");
@@ -15,6 +17,9 @@ const { initializeReceiptChecking } = require("./utils/notificationService");
 const uploadRoutes = require('./routes/upload');
 const notificationRoutes = require('./routes/notifications');
 const socialRoutes = require('./routes/social');
+
+// Swagger configuration
+const swaggerOptions = require('./swaggerDef');
 
 // Initialize Express app
 const app = express();
@@ -118,6 +123,14 @@ app.use('/api/upload', uploadRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/social', socialRoutes);
 
+// Swagger documentation
+const specs = swaggerJsdoc(swaggerOptions);
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs, {
+  explorer: true,
+  customCss: '.swagger-ui .topbar { display: none }',
+  customSiteTitle: 'Friendlines API Documentation'
+}));
+
 // Root endpoint
 app.get("/", (req, res) => {
   res.status(200).json({
@@ -129,6 +142,7 @@ app.get("/", (req, res) => {
       description:
         "Satirical social news API - Transform everyday updates into newsflashes",
       environment: NODE_ENV,
+      documentation: "GET /api-docs",
       endpoints: {
         health: "GET /health",
         auth: {

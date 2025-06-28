@@ -52,9 +52,59 @@ const profileUpdateLimiter = createCustomLimiter({
 });
 
 /**
- * POST /login
- * User login/registration endpoint
- * Creates new user or logs in existing user (no password required)
+ * @swagger
+ * /api/login:
+ *   post:
+ *     tags: [Authentication]
+ *     summary: User login/registration
+ *     description: Creates new user or logs in existing user (no password required)
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - username
+ *               - email
+ *             properties:
+ *               username:
+ *                 type: string
+ *                 description: User display name
+ *                 example: "john_doe"
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 description: User email address
+ *                 example: "john@example.com"
+ *               avatar:
+ *                 type: string
+ *                 description: URL to user avatar image
+ *                 example: "https://example.com/avatar.jpg"
+ *     responses:
+ *       200:
+ *         description: Login successful
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/ApiResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       $ref: '#/components/schemas/User'
+ *       400:
+ *         description: Invalid input
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       429:
+ *         description: Too many requests
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 router.post(
   "/login",
@@ -66,8 +116,38 @@ router.post(
 );
 
 /**
- * GET /users/:id
- * Get user profile by ID
+ * @swagger
+ * /api/users/{id}:
+ *   get:
+ *     tags: [Authentication]
+ *     summary: Get user profile by ID
+ *     description: Retrieve detailed user profile information
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: User ID
+ *         example: "user_123"
+ *     responses:
+ *       200:
+ *         description: User profile retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/ApiResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       $ref: '#/components/schemas/User'
+ *       404:
+ *         description: User not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 router.get(
   "/users/:id",

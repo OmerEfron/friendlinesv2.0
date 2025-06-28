@@ -7,7 +7,8 @@
     "start": "node server.js",
     "dev": "nodemon server.js",
     "dev:reset": "node -e \"require('./utils/devDataInitializer.js').resetDevData().then(() => process.exit(0)).catch(err => { console.error(err); process.exit(1); })\"",
-    "test": "jest --passWithNoTests"
+    "test": "jest --passWithNoTests",
+    "docs:generate": "node scripts/generate-docs.js"
   },
   "keywords": [
     "express",
@@ -26,10 +27,13 @@
     "firebase-admin": "^13.4.0",
     "helmet": "^7.0.0",
     "multer": "^1.4.5-lts.1",
-    "sqlite3": "^5.1.7"
+    "sqlite3": "^5.1.7",
+    "swagger-jsdoc": "^6.2.8",
+    "swagger-ui-express": "^5.0.0"
   },
   "devDependencies": {
     "jest": "^29.5.0",
+    "js-yaml": "^4.1.0",
     "nodemon": "^3.0.1",
     "supertest": "^6.3.3"
   }
