@@ -8,7 +8,8 @@ const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
 const path = require("path");
-const { initializeDatabase, initializeDataFiles, closeDatabase } = require("./utils/dbUtils");
+const { db } = require("./utils/database");
+const { MigrationService } = require("./utils/migrationService");
 const { initializeDevData } = require("./utils/devDataInitializer");
 const { initializeReceiptChecking } = require("./utils/notificationService");
 const uploadRoutes = require('./routes/upload');
@@ -250,15 +251,15 @@ app.use((error, req, res, next) => {
 });
 
 // Graceful shutdown handling
-process.on("SIGTERM", () => {
+process.on("SIGTERM", async () => {
   console.log("📦 SIGTERM received, shutting down gracefully...");
-  closeDatabase();
+  await db.close();
   process.exit(0);
 });
 
-process.on("SIGINT", () => {
+process.on("SIGINT", async () => {
   console.log("📦 SIGINT received, shutting down gracefully...");
-  closeDatabase();
+  await db.close();
   process.exit(0);
 });
 
@@ -267,13 +268,14 @@ const startServer = async () => {
   try {
     console.log("🔧 Initializing Friendlines Backend...");
 
-    // Initialize database
-    await initializeDatabase();
-    console.log("✅ Database initialized");
+    // Initialize modern database service
+    await db.initialize();
+    console.log("✅ Modern database initialized");
 
-    // Initialize data files (includes migration)
-    await initializeDataFiles();
-    console.log("✅ Data files initialized");
+    // Run migration from legacy format if needed
+    const migrationService = new MigrationService();
+    await migrationService.runMigration();
+    console.log("✅ Database migration completed");
 
     // Initialize development data if in development mode
     if (NODE_ENV === "development") {

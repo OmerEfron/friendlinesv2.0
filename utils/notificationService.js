@@ -6,10 +6,48 @@ const { readJson, writeJson, generateId } = require('./dbUtils');
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 
-// Create Expo SDK instance with access token if available
+// Firebase Admin SDK for FCM V1
+let admin = null;
+let firebaseInitialized = false;
+
+// Initialize Firebase Admin SDK
+const initializeFirebase = () => {
+  if (firebaseInitialized) return;
+  
+  try {
+    const admin = require('firebase-admin');
+    const serviceAccountPath = path.join(__dirname, '../firebase-admin-key.json');
+    
+    // Check if service account file exists
+    const fs = require('fs');
+    if (!fs.existsSync(serviceAccountPath)) {
+      console.warn('⚠️ Firebase service account key not found. FCM V1 will use Expo access token fallback.');
+      return;
+    }
+    
+    const serviceAccount = require(serviceAccountPath);
+    
+    if (!admin.apps.length) {
+      admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount),
+      });
+      console.log('✅ Firebase Admin SDK initialized for FCM V1');
+    }
+    
+    firebaseInitialized = true;
+  } catch (error) {
+    console.error('❌ Failed to initialize Firebase Admin SDK:', error);
+    console.warn('⚠️ Falling back to Expo access token for push notifications');
+  }
+};
+
+// Initialize Firebase on module load
+initializeFirebase();
+
+// Create Expo SDK instance with FCM V1 support
 const expo = new Expo({
   accessToken: process.env.EXPO_ACCESS_TOKEN,
-  useFcmV1: true // Use FCM V1 API
+  useFcmV1: firebaseInitialized, // Only use FCM V1 if Firebase is properly initialized
 });
 
 // Database connection for receipt tracking

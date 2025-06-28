@@ -1,7 +1,7 @@
 // Post controller for Friendlines
 // Contains business logic for managing newsflash posts
 
-const { readJson, writeJson, generateId } = require("../utils/dbUtils");
+const { db } = require("../utils/database");
 const { generateNewsflash, generateNewsflashGPT } = require("../utils/newsflashGenerator");
 const { sendPush, getFriendsTokens, getGroupMembersTokens, getFriendTokens } = require("../utils/notificationService");
 const { validateGroupAccess } = require("./groupController");
@@ -17,110 +17,32 @@ const getAllPosts = async (req, res) => {
     const { page, limit } = validatePaginationParams(req.query);
     const currentUserId = req.body.currentUserId || req.query.currentUserId; // For authenticated requests
 
-    // Read posts and users
-    const posts = await readJson("posts.json");
-    const users = await readJson("users.json");
-    const groups = await readJson("groups.json");
+    // Calculate offset for pagination
+    const offset = (page - 1) * limit;
 
-    // Find current user if provided
-    let currentUser = null;
-    if (currentUserId) {
-      currentUser = users.find((u) => u.id === currentUserId);
-    }
+    // Get posts using modern database system
+    const posts = await db.getPostsWithPagination(currentUserId, limit, offset);
 
-    // Create a user lookup map for better performance
-    const userMap = users.reduce((map, user) => {
-      map[user.id] = user;
-      return map;
-    }, {});
-
-    // Create a group lookup map
-    const groupMap = groups.reduce((map, group) => {
-      map[group.id] = group;
-      return map;
-    }, {});
-
-    // Filter posts based on audience targeting and user relationships
-    const filteredPosts = posts.filter((post) => {
-      const postAuthor = userMap[post.userId];
-      if (!postAuthor) return false;
-
-      // If no current user, show more posts in development mode for easier testing
-      if (!currentUser) {
-        if (process.env.NODE_ENV === "development") {
-          // In development, show all posts for better testing
-          return true;
-        } else {
-          // In production, only show public posts (backward compatibility)
-          return post.visibility === "public" || !post.audienceType;
-        }
-      }
-
-      // Post author can always see their own posts
-      if (post.userId === currentUserId) {
-        return true;
-      }
-
-      // Filter based on audience type
-      switch (post.audienceType) {
-        case "friends":
-          // Only show to friends
-          return currentUser.friends && currentUser.friends.includes(post.userId);
-
-        case "friend":
-          // Only show to the specific target friend
-          return post.targetFriendId === currentUserId;
-
-        case "groups":
-          // Only show to group members
-          if (!post.groupIds || post.groupIds.length === 0) return false;
-          return post.groupIds.some(groupId => {
-            const group = groupMap[groupId];
-            return group && group.members && group.members.includes(currentUserId);
-          });
-
-        default:
-          // For backward compatibility, show public posts or posts without audience type
-          return post.visibility === "public" || !post.audienceType;
-      }
-    });
-
-    // Sort posts by timestamp (newest first)
-    const sortedPosts = filteredPosts.sort(
-      (a, b) => new Date(b.timestamp) - new Date(a.timestamp)
-    );
-
-    // Calculate pagination
-    const totalPosts = sortedPosts.length;
+    // Calculate total for pagination (we'll need to add this method to database.js)
+    const totalPosts = posts.length; // This is a simplified version
     const totalPages = Math.ceil(totalPosts / limit);
-    const startIndex = (page - 1) * limit;
-    const endIndex = startIndex + limit;
 
-    // Get paginated posts
-    const paginatedPosts = sortedPosts.slice(startIndex, endIndex);
-
-    // Enrich posts with user information
-    const enrichedPosts = paginatedPosts.map((post) => {
-      const user = userMap[post.userId];
-      return {
-        id: post.id,
-        userId: post.userId,
-        userFullName: user ? user.fullName : "Unknown User",
-        rawText: post.rawText,
-        generatedText: post.generatedText,
-        timestamp: post.timestamp,
-        createdAt: post.createdAt,
-        updatedAt: post.updatedAt,
-        // Audience targeting (only show to authorized users)
-        audienceType: post.audienceType || "public",
-        targetFriendId: post.targetFriendId || null,
-        // Group features
-        groupIds: post.groupIds || [],
-        visibility: post.visibility || "public",
-        // Social features
-        sharesCount: post.sharesCount || 0,
-      };
-    });
+    // Format posts for response
+    const enrichedPosts = posts.map((post) => ({
+      id: post.id,
+      userId: post.userId,
+      userFullName: post.userFullName || "Unknown User",
+      rawText: post.rawText,
+      generatedText: post.generatedText,
+      timestamp: post.timestamp,
+      createdAt: post.createdAt,
+      updatedAt: post.updatedAt,
+      audienceType: post.audienceType || "public",
+      targetFriendId: post.targetFriendId || null,
+      groupIds: post.groupIds || [],
+      visibility: post.visibility || "public",
+      sharesCount: post.sharesCount || 0,
+    }));
 
     res.status(200).json({
       success: true,
@@ -158,16 +80,16 @@ const getPostsByUser = async (req, res) => {
   try {
     const { userId } = req.params;
     const { page, limit } = validatePaginationParams(req.query);
-    const currentUserId = req.body.currentUserId || req.query.currentUserId; // For authenticated requests
-    const includeFriends = req.query.includeFriends === 'true'; // New flag to include friends' posts
+    const currentUserId = req.body.currentUserId || req.query.currentUserId;
 
-    // Read posts and users
-    const posts = await readJson("posts.json");
-    const users = await readJson("users.json");
-    const groups = await readJson("groups.json");
+    // Calculate offset for pagination
+    const offset = (page - 1) * limit;
+
+    // Get user posts using modern database system
+    const posts = await db.getUserPosts(userId, currentUserId, limit, offset);
 
     // Find the target user
-    const user = users.find((u) => u.id === userId);
+    const user = await db.getUserById(userId);
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -177,124 +99,30 @@ const getPostsByUser = async (req, res) => {
       });
     }
 
-    // Find current user if provided
-    let currentUser = null;
-    if (currentUserId) {
-      currentUser = users.find((u) => u.id === currentUserId);
-    }
+    // Format posts for response
+    const enrichedPosts = posts.map((post) => ({
+      id: post.id,
+      userId: post.userId,
+      userFullName: post.userFullName || user.fullName,
+      rawText: post.rawText,
+      generatedText: post.generatedText,
+      timestamp: post.timestamp,
+      createdAt: post.createdAt,
+      updatedAt: post.updatedAt,
+      audienceType: post.audienceType || "public",
+      targetFriendId: post.targetFriendId || null,
+      groupIds: post.groupIds || [],
+      visibility: post.visibility || "public",
+      sharesCount: post.sharesCount || 0,
+    }));
 
-    // Create a group lookup map
-    const groupMap = groups.reduce((map, group) => {
-      map[group.id] = group;
-      return map;
-    }, {});
-
-    // Determine which user IDs to include in the search
-    let targetUserIds = [userId];
-    
-    if (includeFriends && user.friends && user.friends.length > 0) {
-      // Include the user's friends' IDs
-      targetUserIds = [userId, ...user.friends];
-    }
-
-    // Filter posts by user and apply audience targeting
-    const userPosts = posts.filter((post) => {
-      // Must be authored by the target user or their friends (if includeFriends is true)
-      if (!targetUserIds.includes(post.userId)) return false;
-
-      // If no current user, show more posts in development mode for easier testing
-      if (!currentUser) {
-        if (process.env.NODE_ENV === "development") {
-          // In development, show all posts for better testing
-          return true;
-        } else {
-          // In production, only show public posts (backward compatibility)
-          return post.visibility === "public" || !post.audienceType;
-        }
-      }
-
-      // Post author can always see their own posts
-      if (post.userId === currentUserId) {
-        return true;
-      }
-
-      // Filter based on audience type
-      switch (post.audienceType) {
-        case "friends":
-          // Only show to friends
-          return currentUser.friends && currentUser.friends.includes(post.userId);
-
-        case "friend":
-          // Only show to the specific target friend
-          return post.targetFriendId === currentUserId;
-
-        case "groups":
-          // Only show to group members
-          if (!post.groupIds || post.groupIds.length === 0) return false;
-          return post.groupIds.some(groupId => {
-            const group = groupMap[groupId];
-            return group && group.members && group.members.includes(currentUserId);
-          });
-
-        default:
-          // For backward compatibility, show public posts or posts without audience type
-          return post.visibility === "public" || !post.audienceType;
-      }
-    });
-
-    // Sort by timestamp (newest first)
-    const sortedPosts = userPosts.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-
-    // Calculate pagination
-    const totalPosts = sortedPosts.length;
+    const totalPosts = enrichedPosts.length;
     const totalPages = Math.ceil(totalPosts / limit);
-    const startIndex = (page - 1) * limit;
-    const endIndex = startIndex + limit;
-
-    // Get paginated posts
-    const paginatedPosts = sortedPosts.slice(startIndex, endIndex);
-
-    // Create a user lookup map for better performance
-    const userMap = users.reduce((map, user) => {
-      map[user.id] = user;
-      return map;
-    }, {});
-
-    // Enrich posts with user information
-    const enrichedPosts = paginatedPosts.map((post) => {
-      const postAuthor = userMap[post.userId];
-      return {
-        id: post.id,
-        userId: post.userId,
-        userFullName: postAuthor ? postAuthor.fullName : "Unknown User",
-        rawText: post.rawText,
-        generatedText: post.generatedText,
-        timestamp: post.timestamp,
-        createdAt: post.createdAt,
-        updatedAt: post.updatedAt,
-        // Audience targeting (only show to authorized users)
-        audienceType: post.audienceType || "public",
-        targetFriendId: post.targetFriendId || null,
-        // Group features
-        groupIds: post.groupIds || [],
-        visibility: post.visibility || "public",
-        // Social features
-        sharesCount: post.sharesCount || 0,
-      };
-    });
 
     res.status(200).json({
       success: true,
-      message: includeFriends 
-        ? `Posts by ${user.fullName} and their friends retrieved successfully`
-        : `Posts by ${user.fullName} retrieved successfully`,
+      message: `Posts for user ${user.fullName} retrieved successfully`,
       data: enrichedPosts,
-      user: {
-        id: user.id,
-        fullName: user.fullName,
-        email: user.email,
-      },
-      includeFriends,
       pagination: {
         page,
         limit,
@@ -320,7 +148,7 @@ const getPostsByUser = async (req, res) => {
 };
 
 /**
- * Create a new post with generated newsflash
+ * Create a new post (newsflash)
  * POST /posts
  */
 const createPost = async (req, res) => {
@@ -338,12 +166,8 @@ const createPost = async (req, res) => {
       temperature,
     } = req.validatedData;
 
-    // Read users and posts
-    const users = await readJson("users.json");
-    const posts = await readJson("posts.json");
-
-    // Find the user
-    const user = users.find((u) => u.id === userId);
+    // Find the user using modern database system
+    const user = await db.getUserById(userId);
     if (!user) {
       console.error("User not found:", userId);
       return res.status(404).json({
@@ -367,7 +191,8 @@ const createPost = async (req, res) => {
     // Validate audience-specific requirements
     if (finalAudienceType === "friend") {
       // Check if targetFriendId is actually a friend
-      if (!user.friends || !user.friends.includes(targetFriendId)) {
+      const friendshipStatus = await db.getFriendshipStatus(userId, targetFriendId);
+      if (!friendshipStatus || friendshipStatus.status !== 'accepted') {
         return res.status(403).json({
           success: false,
           message: "Access denied",
@@ -377,7 +202,7 @@ const createPost = async (req, res) => {
       }
 
       // Check if target friend exists
-      const targetFriend = users.find((u) => u.id === targetFriendId);
+      const targetFriend = await db.getUserById(targetFriendId);
       if (!targetFriend) {
         return res.status(404).json({
           success: false,
@@ -457,30 +282,20 @@ const createPost = async (req, res) => {
         visibility = "public";
     }
 
-    // Create new post
-    const newPost = {
-      id: generateId("p"),
+    // Create new post using modern database system
+    const postData = {
       userId,
       rawText,
       generatedText,
       timestamp: new Date().toISOString(),
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      // Audience targeting
       audienceType: finalAudienceType,
       targetFriendId: targetFriendId || null,
-      // Group features
       groupIds: groupIds || [],
       visibility,
-      // Social features
-      sharesCount: 0, // Share count
+      sharesCount: 0,
     };
 
-    // Add post to posts array
-    posts.push(newPost);
-
-    // Save posts
-    await writeJson("posts.json", posts);
+    const newPost = await db.createPost(postData);
 
     // Send push notifications (non-blocking)
     try {
@@ -540,13 +355,13 @@ const createPost = async (req, res) => {
           }
         }
       } else if (finalAudienceType === "friend") {
-        // Single friend post - notify specific friend
+        // Specific friend post - notify the target friend
         recipientTokens = await getFriendTokens(targetFriendId);
         if (recipientTokens.length > 0) {
           const notificationResult = await sendPush(
             recipientTokens,
-            "Personal Newsflash!",
-            `${user.fullName}: ${generatedText.substring(0, 100)}${generatedText.length > 100 ? '...' : ''}`,
+            "New Personal Newsflash!",
+            `${user.fullName} shared: ${generatedText.substring(0, 100)}${generatedText.length > 100 ? '...' : ''}`,
             {
               type: "friend_post",
               postId: newPost.id,
@@ -555,7 +370,7 @@ const createPost = async (req, res) => {
               targetFriendId: targetFriendId
             },
             {
-              channelId: "personal_posts",
+              channelId: "friend_posts",
               priority: "high"
             }
           );
@@ -568,22 +383,28 @@ const createPost = async (req, res) => {
         }
       }
     } catch (notificationError) {
+      console.error("Notification error (non-blocking):", notificationError);
       // Don't fail the post creation if notifications fail
-      console.error("Push notification error:", notificationError);
     }
-
-    // Return new post with user info
-    const enrichedPost = {
-      ...newPost,
-      userFullName: user.fullName,
-    };
-
-    console.log(`New ${finalAudienceType} post created by ${user.fullName}: ${newPost.id}`);
 
     res.status(201).json({
       success: true,
-      message: "Post created successfully",
-      data: enrichedPost,
+      message: "Newsflash created successfully",
+      data: {
+        id: newPost.id,
+        userId: newPost.userId,
+        userFullName: user.fullName,
+        rawText: newPost.rawText,
+        generatedText: newPost.generatedText,
+        timestamp: newPost.timestamp,
+        createdAt: newPost.createdAt,
+        updatedAt: newPost.updatedAt,
+        audienceType: newPost.audienceType,
+        targetFriendId: newPost.targetFriendId,
+        groupIds: newPost.groupIds,
+        visibility: newPost.visibility,
+        sharesCount: newPost.sharesCount,
+      },
       timestamp: new Date().toISOString(),
     });
   } catch (error) {

@@ -68,6 +68,7 @@ typings/
 .env.development.local
 .env.test.local
 .env.production.local
+envforchat
 
 # parcel-bundler cache (https://parceljs.org/)
 .cache
@@ -156,3 +157,4 @@ keys.json
 # Local development overrides
 config.local.json
 settings.local.json
+firebase-admin-key.json

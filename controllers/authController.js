@@ -1,7 +1,7 @@
 // Authentication controller for Friendlines
 // Contains business logic for user authentication
 
-const { readJson, writeJson, generateId } = require("../utils/dbUtils");
+const { db } = require("../utils/database");
 const { isValidId, validateProfileUpdateData, validatePaginationParams } = require("../utils/validation");
 const { registerDevice, sendPush, getFriendTokens } = require("../utils/notificationService");
 
@@ -14,43 +14,31 @@ const login = async (req, res) => {
     // Get validated data from middleware
     const { fullName, email } = req.validatedData;
 
-    // Read existing users
-    const users = await readJson("users.json");
-
     // Check if user already exists by email
-    let user = users.find((u) => u.email === email);
+    let user = await db.getUserByEmail(email);
 
     if (user) {
       // Update user's full name if it has changed
       if (user.fullName !== fullName) {
-        user.fullName = fullName;
-        user.updatedAt = new Date().toISOString();
-
-        // Save updated user data
-        await writeJson("users.json", users);
+        user = await db.updateUser(user.id, { 
+          fullName: fullName 
+        });
       }
 
       console.log(`Existing user logged in: ${user.email}`);
     } else {
       // Create new user
-      user = {
-        id: generateId("u"),
+      user = await db.createUser({
         fullName,
-        email,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        // Friendship features
-        friends: [], // Array of user IDs who are friends with this user
-        friendRequests: [], // Array of user IDs who sent friend requests
-        sentFriendRequests: [], // Array of user IDs to whom this user sent friend requests
-        friendsCount: 0, // Denormalized count for performance
-      };
-
-      users.push(user);
-      await writeJson("users.json", users);
+        email
+      });
 
       console.log(`New user created: ${user.email}`);
     }
+
+    // Get friend count for response
+    const friends = await db.getUserFriends(user.id);
+    const friendsCount = friends.length;
 
     // Return user data (excluding sensitive info, though there's none in this POC)
     const userResponse = {
@@ -60,7 +48,7 @@ const login = async (req, res) => {
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
       // Friendship features
-      friendsCount: user.friendsCount || 0,
+      friendsCount: friendsCount,
     };
 
     res.status(200).json({
@@ -94,11 +82,8 @@ const getUserProfile = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Read users
-    const users = await readJson("users.json");
-
     // Find user by ID
-    const user = users.find((u) => u.id === id);
+    const user = await db.getUserById(id);
 
     if (!user) {
       return res.status(404).json({
@@ -109,15 +94,23 @@ const getUserProfile = async (req, res) => {
       });
     }
 
+    // Get friend count
+    const friends = await db.getUserFriends(user.id);
+    const friendsCount = friends.length;
+
     // Return user profile (excluding sensitive data)
     const userProfile = {
       id: user.id,
       fullName: user.fullName,
       email: user.email,
+      bio: user.bio,
+      location: user.location,
+      website: user.website,
+      avatar: user.avatar,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
       // Friendship features
-      friendsCount: user.friendsCount || 0,
+      friendsCount: friendsCount,
     };
 
     res.status(200).json({
@@ -156,25 +149,42 @@ const getAllUsers = async (req, res) => {
       });
     }
 
-    // Read users
-    const users = await readJson("users.json");
+    // Validate pagination parameters
+    const { page, limit } = validatePaginationParams(req.query);
+    const offset = (page - 1) * limit;
 
-    // Return all users (excluding sensitive data)
-    const userList = users.map((user) => ({
-      id: user.id,
-      fullName: user.fullName,
-      email: user.email,
-      createdAt: user.createdAt,
-      updatedAt: user.updatedAt,
-      // Friendship features
-      friendsCount: user.friendsCount || 0,
-    }));
+    // Get users with pagination
+    const users = await db.getAllUsers(limit, offset);
+
+    // Get friend counts for each user (could be optimized with a join)
+    const userList = await Promise.all(
+      users.map(async (user) => {
+        const friends = await db.getUserFriends(user.id);
+        return {
+          id: user.id,
+          fullName: user.fullName,
+          email: user.email,
+          bio: user.bio,
+          location: user.location,
+          website: user.website,
+          avatar: user.avatar,
+          createdAt: user.createdAt,
+          updatedAt: user.updatedAt,
+          // Friendship features
+          friendsCount: friends.length,
+        };
+      })
+    );
 
     res.status(200).json({
       success: true,
       message: "All users retrieved successfully",
       data: userList,
-      count: userList.length,
+      pagination: {
+        page,
+        limit,
+        count: userList.length,
+      },
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
@@ -192,35 +202,30 @@ const getAllUsers = async (req, res) => {
 };
 
 /**
- * Check if a user exists by email
+ * Check if user exists by email
  * POST /users/check
  */
 const checkUserExists = async (req, res) => {
   try {
     const { email } = req.body;
 
-    if (!email || typeof email !== "string") {
+    if (!email || typeof email !== "string" || email.trim().length === 0) {
       return res.status(400).json({
         success: false,
         message: "Email is required",
-        error: "Valid email address must be provided",
+        error: "Please provide a valid email address",
         timestamp: new Date().toISOString(),
       });
     }
 
-    // Read users
-    const users = await readJson("users.json");
-
-    // Check if user exists
-    const userExists = users.some(
-      (u) => u.email === email.toLowerCase().trim()
-    );
+    // Check if user exists using modern database system
+    const existingUser = await db.getUserByEmail(email.toLowerCase().trim());
 
     res.status(200).json({
       success: true,
       message: "User existence check completed",
       data: {
-        exists: userExists,
+        exists: !!existingUser,
         email: email.toLowerCase().trim(),
       },
       timestamp: new Date().toISOString(),
@@ -255,16 +260,16 @@ const getUserStats = async (req, res) => {
       });
     }
 
-    // Read users and posts
-    const users = await readJson("users.json");
-    const posts = await readJson("posts.json");
+    // Get stats using modern database system
+    const users = await db.getAllUsers(1000, 0); // Get up to 1000 users for stats
+    const totalPostsCount = await db.getTotalPostsCount();
 
     // Calculate statistics
     const stats = {
       totalUsers: users.length,
-      totalPosts: posts.length,
+      totalPosts: totalPostsCount,
       postsPerUser:
-        users.length > 0 ? (posts.length / users.length).toFixed(2) : 0,
+        users.length > 0 ? (totalPostsCount / users.length).toFixed(2) : 0,
       recentUsers: users
         .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
         .slice(0, 5)
@@ -325,14 +330,11 @@ const sendFriendRequest = async (req, res) => {
       });
     }
 
-    // Read users
-    const users = await readJson("users.json");
-
     // Find both users
-    const targetUserIndex = users.findIndex((u) => u.id === id);
-    const currentUserIndex = users.findIndex((u) => u.id === userId);
+    const targetUser = await db.getUserById(id);
+    const currentUser = await db.getUserById(userId);
 
-    if (targetUserIndex === -1) {
+    if (!targetUser) {
       return res.status(404).json({
         success: false,
         message: "Target user not found",
@@ -341,7 +343,7 @@ const sendFriendRequest = async (req, res) => {
       });
     }
 
-    if (currentUserIndex === -1) {
+    if (!currentUser) {
       return res.status(404).json({
         success: false,
         message: "Current user not found",
@@ -350,56 +352,37 @@ const sendFriendRequest = async (req, res) => {
       });
     }
 
-    const targetUser = users[targetUserIndex];
-    const currentUser = users[currentUserIndex];
-
-    // Initialize friendship-related arrays if they don't exist
-    if (!targetUser.friendRequests) targetUser.friendRequests = [];
-    if (!currentUser.sentFriendRequests) currentUser.sentFriendRequests = [];
-    if (!targetUser.friends) targetUser.friends = [];
-    if (!currentUser.friends) currentUser.friends = [];
-
-    // Check if they're already friends
-    if (targetUser.friends.includes(userId)) {
-      return res.status(400).json({
-        success: false,
-        message: "You are already friends with this user",
-        timestamp: new Date().toISOString(),
-      });
+    // Check if friendship already exists
+    const existingFriendship = await db.getFriendshipStatus(userId, id);
+    
+    if (existingFriendship) {
+      if (existingFriendship.status === 'accepted') {
+        return res.status(400).json({
+          success: false,
+          message: "You are already friends with this user",
+          timestamp: new Date().toISOString(),
+        });
+      }
+      
+      if (existingFriendship.status === 'pending') {
+        if (existingFriendship.requesterId === userId) {
+          return res.status(400).json({
+            success: false,
+            message: "Friend request already sent",
+            timestamp: new Date().toISOString(),
+          });
+        } else {
+          return res.status(400).json({
+            success: false,
+            message: "This user has already sent you a friend request. Accept it instead.",
+            timestamp: new Date().toISOString(),
+          });
+        }
+      }
     }
 
-    // Check if friend request already exists
-    if (targetUser.friendRequests.includes(userId)) {
-      return res.status(400).json({
-        success: false,
-        message: "Friend request already sent",
-        timestamp: new Date().toISOString(),
-      });
-    }
-
-    // Check if target user has already sent a request to current user
-    if (currentUser.friendRequests && currentUser.friendRequests.includes(id)) {
-      return res.status(400).json({
-        success: false,
-        message: "This user has already sent you a friend request. Accept it instead.",
-        timestamp: new Date().toISOString(),
-      });
-    }
-
-    // Add friend request
-    targetUser.friendRequests.push(userId);
-    currentUser.sentFriendRequests.push(id);
-
-    // Update timestamps
-    targetUser.updatedAt = new Date().toISOString();
-    currentUser.updatedAt = new Date().toISOString();
-
-    // Update users in array
-    users[targetUserIndex] = targetUser;
-    users[currentUserIndex] = currentUser;
-
-    // Save updated users
-    await writeJson("users.json", users);
+    // Send friend request
+    await db.sendFriendRequest(userId, id);
 
     // Send push notification to target user (non-blocking)
     try {
@@ -459,13 +442,13 @@ const sendFriendRequest = async (req, res) => {
 };
 
 /**
- * Accept friend request from a user
+ * Accept friend request
  * POST /users/:id/accept-friend
  */
 const acceptFriendRequest = async (req, res) => {
   try {
-    const { id } = req.params; // User who sent the request
-    const { userId } = req.body; // Current user ID (who is accepting)
+    const { id } = req.params; // Requester user ID
+    const { userId } = req.body; // Current user ID (who's accepting)
 
     // Validate userId
     if (!userId || typeof userId !== "string" || userId.trim().length === 0) {
@@ -477,14 +460,23 @@ const acceptFriendRequest = async (req, res) => {
       });
     }
 
-    // Read users
-    const users = await readJson("users.json");
+    // Prevent users from accepting their own request
+    if (id === userId) {
+      return res.status(400).json({
+        success: false,
+        message: "Cannot accept your own friend request",
+        error: "Users cannot accept their own friend requests",
+        timestamp: new Date().toISOString(),
+      });
+    }
 
-    // Find both users
-    const requesterUserIndex = users.findIndex((u) => u.id === id);
-    const currentUserIndex = users.findIndex((u) => u.id === userId);
+    // Check if both users exist
+    const [requesterUser, currentUser] = await Promise.all([
+      db.getUserById(id),
+      db.getUserById(userId)
+    ]);
 
-    if (requesterUserIndex === -1) {
+    if (!requesterUser) {
       return res.status(404).json({
         success: false,
         message: "Requester user not found",
@@ -493,7 +485,7 @@ const acceptFriendRequest = async (req, res) => {
       });
     }
 
-    if (currentUserIndex === -1) {
+    if (!currentUser) {
       return res.status(404).json({
         success: false,
         message: "Current user not found",
@@ -502,46 +494,29 @@ const acceptFriendRequest = async (req, res) => {
       });
     }
 
-    const requesterUser = users[requesterUserIndex];
-    const currentUser = users[currentUserIndex];
-
-    // Initialize arrays if they don't exist
-    if (!currentUser.friendRequests) currentUser.friendRequests = [];
-    if (!requesterUser.sentFriendRequests) requesterUser.sentFriendRequests = [];
-    if (!currentUser.friends) currentUser.friends = [];
-    if (!requesterUser.friends) requesterUser.friends = [];
-
-    // Check if friend request exists
-    if (!currentUser.friendRequests.includes(id)) {
+    // Check if there's a pending friend request
+    const friendshipStatus = await db.getFriendshipStatus(id, userId);
+    
+    if (!friendshipStatus || friendshipStatus.status !== 'pending') {
       return res.status(400).json({
         success: false,
-        message: "No friend request found from this user",
+        message: "No pending friend request found",
+        error: "Cannot accept a friend request that doesn't exist or isn't pending",
         timestamp: new Date().toISOString(),
       });
     }
 
-    // Remove from friend requests and sent requests
-    currentUser.friendRequests = currentUser.friendRequests.filter(reqId => reqId !== id);
-    requesterUser.sentFriendRequests = requesterUser.sentFriendRequests.filter(reqId => reqId !== userId);
+    if (friendshipStatus.requesterId !== id) {
+      return res.status(400).json({
+        success: false,
+        message: "Cannot accept this request",
+        error: "You can only accept requests sent to you",
+        timestamp: new Date().toISOString(),
+      });
+    }
 
-    // Add to friends lists
-    currentUser.friends.push(id);
-    requesterUser.friends.push(userId);
-
-    // Update friend counts
-    currentUser.friendsCount = currentUser.friends.length;
-    requesterUser.friendsCount = requesterUser.friends.length;
-
-    // Update timestamps
-    currentUser.updatedAt = new Date().toISOString();
-    requesterUser.updatedAt = new Date().toISOString();
-
-    // Update users in array
-    users[currentUserIndex] = currentUser;
-    users[requesterUserIndex] = requesterUser;
-
-    // Save updated users
-    await writeJson("users.json", users);
+    // Accept the friend request
+    await db.acceptFriendRequest(id, userId);
 
     // Send push notification to requester (non-blocking)
     try {
@@ -564,26 +539,22 @@ const acceptFriendRequest = async (req, res) => {
         );
         
         if (notificationResult.success) {
-          console.log(`Friend request acceptance notification sent to ${requesterUser.fullName} from ${currentUser.fullName}`);
-        } else {
-          console.error(`Failed to send friend request acceptance notification to ${requesterUser.fullName}:`, notificationResult.error);
+          console.log(`Friend request acceptance notification sent to ${requesterUser.fullName}`);
         }
       }
     } catch (notificationError) {
-      // Don't fail the acceptance if notifications fail
-      console.error("Friend request acceptance notification error:", notificationError);
+      console.error("Notification error (non-blocking):", notificationError);
     }
-
-    console.log(`${currentUser.fullName} accepted friend request from ${requesterUser.fullName}`);
 
     res.status(200).json({
       success: true,
       message: "Friend request accepted successfully",
       data: {
-        requesterUserId: id,
-        currentUserId: userId,
-        areFriends: true,
-        friendsCount: currentUser.friendsCount,
+        requesterId: id,
+        requesterName: requesterUser.fullName,
+        accepterId: userId,
+        accepterName: currentUser.fullName,
+        acceptedAt: new Date().toISOString(),
       },
       timestamp: new Date().toISOString(),
     });
@@ -602,89 +573,66 @@ const acceptFriendRequest = async (req, res) => {
 };
 
 /**
- * Reject friend request from a user
+ * Reject friend request
  * POST /users/:id/reject-friend
  */
 const rejectFriendRequest = async (req, res) => {
   try {
-    const { id } = req.params; // User who sent the request
-    const { userId } = req.body; // Current user ID (who is rejecting)
+    const { id } = req.params; // Requester user ID
+    const { userId } = req.body; // Current user ID (who's rejecting)
 
-    // Validate userId
-    if (!userId || typeof userId !== "string" || userId.trim().length === 0) {
+    if (!userId) {
       return res.status(400).json({
         success: false,
         message: "User ID is required",
-        error: "Valid user ID must be provided to reject a friend request",
         timestamp: new Date().toISOString(),
       });
     }
 
-    // Read users
-    const users = await readJson("users.json");
-
-    // Find both users
-    const requesterUserIndex = users.findIndex((u) => u.id === id);
-    const currentUserIndex = users.findIndex((u) => u.id === userId);
-
-    if (requesterUserIndex === -1) {
-      return res.status(404).json({
-        success: false,
-        message: "Requester user not found",
-        error: "No user found with the provided requester ID",
-        timestamp: new Date().toISOString(),
-      });
-    }
-
-    if (currentUserIndex === -1) {
-      return res.status(404).json({
-        success: false,
-        message: "Current user not found",
-        error: "No user found with the provided current user ID",
-        timestamp: new Date().toISOString(),
-      });
-    }
-
-    const requesterUser = users[requesterUserIndex];
-    const currentUser = users[currentUserIndex];
-
-    // Initialize arrays if they don't exist
-    if (!currentUser.friendRequests) currentUser.friendRequests = [];
-    if (!requesterUser.sentFriendRequests) requesterUser.sentFriendRequests = [];
-
-    // Check if friend request exists
-    if (!currentUser.friendRequests.includes(id)) {
+    if (id === userId) {
       return res.status(400).json({
         success: false,
-        message: "No friend request found from this user",
+        message: "Cannot reject your own friend request",
         timestamp: new Date().toISOString(),
       });
     }
 
-    // Remove from friend requests and sent requests
-    currentUser.friendRequests = currentUser.friendRequests.filter(reqId => reqId !== id);
-    requesterUser.sentFriendRequests = requesterUser.sentFriendRequests.filter(reqId => reqId !== userId);
+    // Check if both users exist
+    const [requesterUser, currentUser] = await Promise.all([
+      db.getUserById(id),
+      db.getUserById(userId)
+    ]);
 
-    // Update timestamps
-    currentUser.updatedAt = new Date().toISOString();
-    requesterUser.updatedAt = new Date().toISOString();
+    if (!requesterUser || !currentUser) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+        timestamp: new Date().toISOString(),
+      });
+    }
 
-    // Update users in array
-    users[currentUserIndex] = currentUser;
-    users[requesterUserIndex] = requesterUser;
+    // Check if there's a pending friend request
+    const friendshipStatus = await db.getFriendshipStatus(id, userId);
+    
+    if (!friendshipStatus || friendshipStatus.status !== 'pending' || friendshipStatus.requesterId !== id) {
+      return res.status(400).json({
+        success: false,
+        message: "No pending friend request found to reject",
+        timestamp: new Date().toISOString(),
+      });
+    }
 
-    // Save updated users
-    await writeJson("users.json", users);
-
-    console.log(`${currentUser.fullName} rejected friend request from ${requesterUser.fullName}`);
+    // Reject the friend request
+    await db.rejectFriendRequest(id, userId);
 
     res.status(200).json({
       success: true,
       message: "Friend request rejected successfully",
       data: {
-        requesterUserId: id,
-        currentUserId: userId,
-        requestRejected: true,
+        requesterId: id,
+        requesterName: requesterUser.fullName,
+        rejecterId: userId,
+        rejecterName: currentUser.fullName,
       },
       timestamp: new Date().toISOString(),
     });
@@ -693,99 +641,73 @@ const rejectFriendRequest = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Internal server error rejecting friend request",
-      error:
-        process.env.NODE_ENV === "development"
-          ? error.message
-          : "Something went wrong",
+      error: process.env.NODE_ENV === "development" ? error.message : "Something went wrong",
       timestamp: new Date().toISOString(),
     });
   }
 };
 
 /**
- * Cancel sent friend request
+ * Cancel friend request
  * POST /users/:id/cancel-friend-request
  */
 const cancelFriendRequest = async (req, res) => {
   try {
     const { id } = req.params; // Target user ID
-    const { userId } = req.body; // Current user ID (who is canceling)
+    const { userId } = req.body; // Current user ID (who's canceling)
 
-    // Validate userId
-    if (!userId || typeof userId !== "string" || userId.trim().length === 0) {
+    if (!userId) {
       return res.status(400).json({
         success: false,
         message: "User ID is required",
-        error: "Valid user ID must be provided to cancel a friend request",
         timestamp: new Date().toISOString(),
       });
     }
 
-    // Read users
-    const users = await readJson("users.json");
-
-    // Find both users
-    const targetUserIndex = users.findIndex((u) => u.id === id);
-    const currentUserIndex = users.findIndex((u) => u.id === userId);
-
-    if (targetUserIndex === -1) {
-      return res.status(404).json({
-        success: false,
-        message: "Target user not found",
-        error: "No user found with the provided target ID",
-        timestamp: new Date().toISOString(),
-      });
-    }
-
-    if (currentUserIndex === -1) {
-      return res.status(404).json({
-        success: false,
-        message: "Current user not found",
-        error: "No user found with the provided current user ID",
-        timestamp: new Date().toISOString(),
-      });
-    }
-
-    const targetUser = users[targetUserIndex];
-    const currentUser = users[currentUserIndex];
-
-    // Initialize arrays if they don't exist
-    if (!targetUser.friendRequests) targetUser.friendRequests = [];
-    if (!currentUser.sentFriendRequests) currentUser.sentFriendRequests = [];
-
-    // Check if friend request exists
-    if (!currentUser.sentFriendRequests.includes(id)) {
+    if (id === userId) {
       return res.status(400).json({
         success: false,
-        message: "No friend request found to this user",
+        message: "Cannot cancel friend request to yourself",
         timestamp: new Date().toISOString(),
       });
     }
 
-    // Remove from friend requests and sent requests
-    targetUser.friendRequests = targetUser.friendRequests.filter(reqId => reqId !== userId);
-    currentUser.sentFriendRequests = currentUser.sentFriendRequests.filter(reqId => reqId !== id);
+    // Check if both users exist
+    const [targetUser, currentUser] = await Promise.all([
+      db.getUserById(id),
+      db.getUserById(userId)
+    ]);
 
-    // Update timestamps
-    targetUser.updatedAt = new Date().toISOString();
-    currentUser.updatedAt = new Date().toISOString();
+    if (!targetUser || !currentUser) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+        timestamp: new Date().toISOString(),
+      });
+    }
 
-    // Update users in array
-    users[targetUserIndex] = targetUser;
-    users[currentUserIndex] = currentUser;
+    // Check if there's a pending friend request sent by current user
+    const friendshipStatus = await db.getFriendshipStatus(userId, id);
+    
+    if (!friendshipStatus || friendshipStatus.status !== 'pending' || friendshipStatus.requesterId !== userId) {
+      return res.status(400).json({
+        success: false,
+        message: "No pending friend request found to cancel",
+        timestamp: new Date().toISOString(),
+      });
+    }
 
-    // Save updated users
-    await writeJson("users.json", users);
-
-    console.log(`${currentUser.fullName} canceled friend request to ${targetUser.fullName}`);
+    // Cancel the friend request
+    await db.rejectFriendRequest(userId, id);
 
     res.status(200).json({
       success: true,
       message: "Friend request canceled successfully",
       data: {
-        targetUserId: id,
-        currentUserId: userId,
-        requestCanceled: true,
+        targetId: id,
+        targetName: targetUser.fullName,
+        senderId: userId,
+        senderName: currentUser.fullName,
       },
       timestamp: new Date().toISOString(),
     });
@@ -794,17 +716,14 @@ const cancelFriendRequest = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Internal server error canceling friend request",
-      error:
-        process.env.NODE_ENV === "development"
-          ? error.message
-          : "Something went wrong",
+      error: process.env.NODE_ENV === "development" ? error.message : "Something went wrong",
       timestamp: new Date().toISOString(),
     });
   }
 };
 
 /**
- * Remove friendship with a user
+ * Remove friendship
  * POST /users/:id/unfriend
  */
 const removeFriendship = async (req, res) => {
@@ -812,60 +731,40 @@ const removeFriendship = async (req, res) => {
     const { id } = req.params; // Friend user ID
     const { userId } = req.body; // Current user ID
 
-    // Validate userId
-    if (!userId || typeof userId !== "string" || userId.trim().length === 0) {
+    if (!userId) {
       return res.status(400).json({
         success: false,
         message: "User ID is required",
-        error: "Valid user ID must be provided to remove friendship",
         timestamp: new Date().toISOString(),
       });
     }
 
-    // Prevent users from unfriending themselves
     if (id === userId) {
       return res.status(400).json({
         success: false,
         message: "Cannot unfriend yourself",
-        error: "Users cannot unfriend themselves",
         timestamp: new Date().toISOString(),
       });
     }
 
-    // Read users
-    const users = await readJson("users.json");
+    // Check if both users exist
+    const [friendUser, currentUser] = await Promise.all([
+      db.getUserById(id),
+      db.getUserById(userId)
+    ]);
 
-    // Find both users
-    const friendUserIndex = users.findIndex((u) => u.id === id);
-    const currentUserIndex = users.findIndex((u) => u.id === userId);
-
-    if (friendUserIndex === -1) {
+    if (!friendUser || !currentUser) {
       return res.status(404).json({
         success: false,
-        message: "Friend user not found",
-        error: "No user found with the provided friend ID",
+        message: "User not found",
         timestamp: new Date().toISOString(),
       });
     }
-
-    if (currentUserIndex === -1) {
-      return res.status(404).json({
-        success: false,
-        message: "Current user not found",
-        error: "No user found with the provided current user ID",
-        timestamp: new Date().toISOString(),
-      });
-    }
-
-    const friendUser = users[friendUserIndex];
-    const currentUser = users[currentUserIndex];
-
-    // Initialize arrays if they don't exist
-    if (!currentUser.friends) currentUser.friends = [];
-    if (!friendUser.friends) friendUser.friends = [];
 
     // Check if they are friends
-    if (!currentUser.friends.includes(id)) {
+    const friendshipStatus = await db.getFriendshipStatus(userId, id);
+    
+    if (!friendshipStatus || friendshipStatus.status !== 'accepted') {
       return res.status(400).json({
         success: false,
         message: "You are not friends with this user",
@@ -873,35 +772,17 @@ const removeFriendship = async (req, res) => {
       });
     }
 
-    // Remove from friends lists
-    currentUser.friends = currentUser.friends.filter(friendId => friendId !== id);
-    friendUser.friends = friendUser.friends.filter(friendId => friendId !== userId);
-
-    // Update friend counts
-    currentUser.friendsCount = currentUser.friends.length;
-    friendUser.friendsCount = friendUser.friends.length;
-
-    // Update timestamps
-    currentUser.updatedAt = new Date().toISOString();
-    friendUser.updatedAt = new Date().toISOString();
-
-    // Update users in array
-    users[currentUserIndex] = currentUser;
-    users[friendUserIndex] = friendUser;
-
-    // Save updated users
-    await writeJson("users.json", users);
-
-    console.log(`${currentUser.fullName} unfriended ${friendUser.fullName}`);
+    // Remove the friendship
+    await db.removeFriendship(userId, id);
 
     res.status(200).json({
       success: true,
       message: "Friendship removed successfully",
       data: {
-        friendUserId: id,
-        currentUserId: userId,
-        areFriends: false,
-        friendsCount: currentUser.friendsCount,
+        removedFriendId: id,
+        removedFriendName: friendUser.fullName,
+        userId: userId,
+        userName: currentUser.fullName,
       },
       timestamp: new Date().toISOString(),
     });
@@ -910,10 +791,7 @@ const removeFriendship = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Internal server error removing friendship",
-      error:
-        process.env.NODE_ENV === "development"
-          ? error.message
-          : "Something went wrong",
+      error: process.env.NODE_ENV === "development" ? error.message : "Something went wrong",
       timestamp: new Date().toISOString(),
     });
   }
@@ -928,71 +806,39 @@ const getFriends = async (req, res) => {
     const { id } = req.params;
     const { page = 1, limit = 20 } = req.query;
 
-    // Validate pagination parameters
-    const validatedParams = { page: parseInt(page) || 1, limit: Math.min(parseInt(limit) || 20, 50) };
-    
-    if (validatedParams.page < 1) validatedParams.page = 1;
-    if (validatedParams.limit < 1) validatedParams.limit = 20;
-
-    // Read users
-    const users = await readJson("users.json");
-
-    // Find the target user
-    const targetUser = users.find((u) => u.id === id);
-    if (!targetUser) {
+    // Check if user exists
+    const user = await db.getUserById(id);
+    if (!user) {
       return res.status(404).json({
         success: false,
         message: "User not found",
-        error: "No user found with the provided ID",
         timestamp: new Date().toISOString(),
       });
     }
 
-    // Ensure friends array exists
-    const friends = targetUser.friends || [];
-
     // Calculate pagination
-    const totalFriends = friends.length;
-    const totalPages = Math.ceil(totalFriends / validatedParams.limit);
-    const startIndex = (validatedParams.page - 1) * validatedParams.limit;
-    const endIndex = startIndex + validatedParams.limit;
+    const offset = (parseInt(page) - 1) * parseInt(limit);
 
-    // Get paginated friend IDs
-    const paginatedFriendIds = friends.slice(startIndex, endIndex);
+    // Get user's friends
+    const friends = await db.getUserFriends(id, parseInt(limit), offset);
 
-    // Create a user lookup map for better performance
-    const userMap = users.reduce((map, user) => {
-      map[user.id] = user;
-      return map;
-    }, {});
-
-    // Enrich friends with user information
-    const enrichedFriends = paginatedFriendIds.map((friendId) => {
-      const friend = userMap[friendId];
-      return {
-        id: friendId,
-        fullName: friend ? friend.fullName : "Unknown User",
-        email: friend ? friend.email : null,
-        friendsCount: friend ? (friend.friendsCount || 0) : 0,
-      };
-    });
+    const friendsList = friends.map(friend => ({
+      id: friend.id,
+      fullName: friend.fullName,
+      email: friend.email,
+      bio: friend.bio,
+      avatar: friend.avatar,
+      // Don't include sensitive information like push tokens
+    }));
 
     res.status(200).json({
       success: true,
-      message: "User friends retrieved successfully",
-      data: {
-        userId: id,
-        userName: targetUser.fullName,
-        friendsCount: totalFriends,
-        friends: enrichedFriends,
-      },
+      message: "Friends retrieved successfully",
+      data: friendsList,
       pagination: {
-        page: validatedParams.page,
-        limit: validatedParams.limit,
-        totalFriends,
-        totalPages,
-        hasNextPage: validatedParams.page < totalPages,
-        hasPrevPage: validatedParams.page > 1,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        count: friendsList.length,
       },
       timestamp: new Date().toISOString(),
     });
@@ -1001,101 +847,68 @@ const getFriends = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Internal server error retrieving friends",
-      error:
-        process.env.NODE_ENV === "development"
-          ? error.message
-          : "Something went wrong",
+      error: process.env.NODE_ENV === "development" ? error.message : "Something went wrong",
       timestamp: new Date().toISOString(),
     });
   }
 };
 
 /**
- * Get pending friend requests for a user
+ * Get pending friend requests
  * GET /users/:id/friend-requests
  */
 const getPendingRequests = async (req, res) => {
   try {
     const { id } = req.params;
-    const { page = 1, limit = 20, type = 'received' } = req.query;
+    const { type = 'received' } = req.query; // 'received' or 'sent'
 
-    // Validate pagination parameters
-    const validatedParams = { page: parseInt(page) || 1, limit: Math.min(parseInt(limit) || 20, 50) };
-    
-    if (validatedParams.page < 1) validatedParams.page = 1;
-    if (validatedParams.limit < 1) validatedParams.limit = 20;
-
-    // Validate type parameter
-    if (!['received', 'sent'].includes(type)) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid type parameter. Must be 'received' or 'sent'",
-        timestamp: new Date().toISOString(),
-      });
-    }
-
-    // Read users
-    const users = await readJson("users.json");
-
-    // Find the target user
-    const targetUser = users.find((u) => u.id === id);
-    if (!targetUser) {
+    // Check if user exists
+    const user = await db.getUserById(id);
+    if (!user) {
       return res.status(404).json({
         success: false,
         message: "User not found",
-        error: "No user found with the provided ID",
         timestamp: new Date().toISOString(),
       });
     }
 
-    // Get the appropriate requests array
-    const requests = type === 'received' 
-      ? (targetUser.friendRequests || [])
-      : (targetUser.sentFriendRequests || []);
+    let requests = [];
 
-    // Calculate pagination
-    const totalRequests = requests.length;
-    const totalPages = Math.ceil(totalRequests / validatedParams.limit);
-    const startIndex = (validatedParams.page - 1) * validatedParams.limit;
-    const endIndex = startIndex + validatedParams.limit;
+    if (type === 'received') {
+      // Get requests sent TO this user
+      requests = await db.getFriendRequests(id);
+    } else if (type === 'sent') {
+      // Get requests sent BY this user
+      requests = await db.getMany(`
+        SELECT u.*, f.createdAt as requestDate FROM users u
+        INNER JOIN friendships f ON f.requesterId = ?
+        WHERE ((f.userId1 = ? AND f.userId2 = u.id) OR (f.userId2 = ? AND f.userId1 = u.id))
+          AND f.status = 'pending' AND u.id != ?
+      `, [id, id, id, id]);
+    } else {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid type parameter. Use 'received' or 'sent'",
+        timestamp: new Date().toISOString(),
+      });
+    }
 
-    // Get paginated request IDs
-    const paginatedRequestIds = requests.slice(startIndex, endIndex);
-
-    // Create a user lookup map for better performance
-    const userMap = users.reduce((map, user) => {
-      map[user.id] = user;
-      return map;
-    }, {});
-
-    // Enrich requests with user information
-    const enrichedRequests = paginatedRequestIds.map((requestId) => {
-      const user = userMap[requestId];
-      return {
-        id: requestId,
-        fullName: user ? user.fullName : "Unknown User",
-        email: user ? user.email : null,
-        friendsCount: user ? (user.friendsCount || 0) : 0,
-      };
-    });
+    const formattedRequests = requests.map(request => ({
+      id: request.id,
+      fullName: request.fullName,
+      email: request.email,
+      bio: request.bio,
+      avatar: request.avatar,
+      requestDate: request.requestDate,
+    }));
 
     res.status(200).json({
       success: true,
-      message: `${type === 'received' ? 'Received' : 'Sent'} friend requests retrieved successfully`,
-      data: {
-        userId: id,
-        userName: targetUser.fullName,
-        requestsCount: totalRequests,
-        requestType: type,
-        requests: enrichedRequests,
-      },
-      pagination: {
-        page: validatedParams.page,
-        limit: validatedParams.limit,
-        totalRequests,
-        totalPages,
-        hasNextPage: validatedParams.page < totalPages,
-        hasPrevPage: validatedParams.page > 1,
+      message: `${type} friend requests retrieved successfully`,
+      data: formattedRequests,
+      metadata: {
+        type: type,
+        count: formattedRequests.length,
       },
       timestamp: new Date().toISOString(),
     });
@@ -1104,10 +917,7 @@ const getPendingRequests = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Internal server error retrieving friend requests",
-      error:
-        process.env.NODE_ENV === "development"
-          ? error.message
-          : "Something went wrong",
+      error: process.env.NODE_ENV === "development" ? error.message : "Something went wrong",
       timestamp: new Date().toISOString(),
     });
   }
@@ -1122,82 +932,71 @@ const getFriendshipStatus = async (req, res) => {
     const { id } = req.params; // Target user ID
     const { userId } = req.query; // Current user ID
 
-    // Validate userId query parameter
-    if (!userId || typeof userId !== "string" || userId.trim().length === 0) {
+    if (!userId) {
       return res.status(400).json({
         success: false,
-        message: "Missing userId in query parameters",
-        error: "Valid user ID must be provided in query parameters",
+        message: "User ID is required in query parameters",
         timestamp: new Date().toISOString(),
       });
     }
 
-    // Validate ID format using the same validation as other endpoints
-    if (!/^[a-zA-Z0-9]+$/.test(id) || !/^[a-zA-Z0-9]+$/.test(userId)) {
+    if (id === userId) {
       return res.status(400).json({
         success: false,
-        message: "Invalid user ID format",
-        error: "User IDs must contain only alphanumeric characters",
+        message: "Cannot check friendship status with yourself",
         timestamp: new Date().toISOString(),
       });
     }
 
-    // Read users
-    const users = await readJson("users.json");
+    // Check if both users exist
+    const [targetUser, currentUser] = await Promise.all([
+      db.getUserById(id),
+      db.getUserById(userId)
+    ]);
 
-    // Find both users
-    const targetUser = users.find((u) => u.id === id);
-    const currentUser = users.find((u) => u.id === userId);
-
-    if (!targetUser) {
+    if (!targetUser || !currentUser) {
       return res.status(404).json({
         success: false,
-        message: "Target user not found",
-        error: "No user found with the provided target ID",
+        message: "User not found",
         timestamp: new Date().toISOString(),
       });
     }
 
-    if (!currentUser) {
-      return res.status(404).json({
-        success: false,
-        message: "Current user not found",
-        error: "No user found with the provided current user ID",
-        timestamp: new Date().toISOString(),
-      });
-    }
-
-    // Initialize arrays if they don't exist
-    const currentUserFriends = currentUser.friends || [];
-    const currentUserSentRequests = currentUser.sentFriendRequests || [];
-    const currentUserReceivedRequests = currentUser.friendRequests || [];
-
-    // Determine friendship status
-    const areFriends = currentUserFriends.includes(id);
-    const requestSent = currentUserSentRequests.includes(id);
-    const requestReceived = currentUserReceivedRequests.includes(id);
+    // Get friendship status
+    const friendshipStatus = await db.getFriendshipStatus(userId, id);
 
     let status = 'none';
-    if (areFriends) {
-      status = 'friends';
-    } else if (requestSent) {
-      status = 'request_sent';
-    } else if (requestReceived) {
-      status = 'request_received';
+    let requesterId = null;
+    let statusDetails = null;
+
+    if (friendshipStatus) {
+      status = friendshipStatus.status;
+      requesterId = friendshipStatus.requesterId;
+      statusDetails = {
+        createdAt: friendshipStatus.createdAt,
+        updatedAt: friendshipStatus.updatedAt,
+      };
     }
 
     res.status(200).json({
       success: true,
       message: "Friendship status retrieved successfully",
       data: {
-        targetUserId: id,
-        targetUserName: targetUser.fullName,
-        currentUserId: userId,
-        currentUserName: currentUser.fullName,
-        status: status,
-        areFriends: areFriends,
-        requestSent: requestSent,
-        requestReceived: requestReceived,
+        targetUser: {
+          id: targetUser.id,
+          fullName: targetUser.fullName,
+        },
+        currentUser: {
+          id: currentUser.id,
+          fullName: currentUser.fullName,
+        },
+        status: status, // 'none', 'pending', 'accepted'
+        requesterId: requesterId,
+        canSendRequest: status === 'none',
+        canAccept: status === 'pending' && requesterId !== userId,
+        canCancel: status === 'pending' && requesterId === userId,
+        areFriends: status === 'accepted',
+        statusDetails: statusDetails,
       },
       timestamp: new Date().toISOString(),
     });
@@ -1206,17 +1005,14 @@ const getFriendshipStatus = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Internal server error retrieving friendship status",
-      error:
-        process.env.NODE_ENV === "development"
-          ? error.message
-          : "Something went wrong",
+      error: process.env.NODE_ENV === "development" ? error.message : "Something went wrong",
       timestamp: new Date().toISOString(),
     });
   }
 };
 
 /**
- * Register push notification token for a user
+ * Register push token for a user
  * POST /users/:id/push-token
  */
 const registerPushToken = async (req, res) => {
@@ -1224,66 +1020,17 @@ const registerPushToken = async (req, res) => {
     const { id } = req.params;
     const { expoPushToken } = req.body;
 
-    // Validate expoPushToken
-    if (!expoPushToken || typeof expoPushToken !== "string" || expoPushToken.trim().length === 0) {
+    if (!expoPushToken || typeof expoPushToken !== 'string') {
       return res.status(400).json({
         success: false,
-        message: "Push token is required",
-        error: "Valid Expo push token must be provided",
-        timestamp: new Date().toISOString(),
+        message: 'Valid Expo push token is required',
+        timestamp: new Date().toISOString()
       });
     }
 
-    // Use notification service to register device
-    const result = await registerDevice(id, expoPushToken.trim());
-
-    if (!result.success) {
-      const statusCode = result.error === 'User not found' ? 404 : 
-                        result.error === 'Invalid Expo push token format' ? 400 : 500;
-      
-      return res.status(statusCode).json({
-        success: false,
-        message: "Failed to register push token",
-        error: result.error,
-        timestamp: new Date().toISOString(),
-      });
-    }
-
-    res.status(200).json({
-      success: true,
-      message: "Push token registered successfully",
-      data: {
-        userId: id,
-        tokenRegistered: true,
-        updatedAt: new Date().toISOString(),
-      },
-      timestamp: new Date().toISOString(),
-    });
-  } catch (error) {
-    console.error("Register push token error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Internal server error registering push token",
-      error:
-        process.env.NODE_ENV === "development"
-          ? error.message
-          : "Something went wrong",
-      timestamp: new Date().toISOString(),
-    });
-  }
-};
-
-const updateUserProfile = async (req, res, next) => {
-  try {
-    const { id } = req.params;
-    const { fullName, bio, location, website, avatar } = req.body;
-
-    // Note: ID validation and profile data validation are handled by middleware
-
-    const users = await readJson('users.json');
-    const userIndex = users.findIndex(user => user.id === id);
-
-    if (userIndex === -1) {
+    // Check if user exists
+    const user = await db.getUserById(id);
+    if (!user) {
       return res.status(404).json({
         success: false,
         message: 'User not found',
@@ -1291,29 +1038,91 @@ const updateUserProfile = async (req, res, next) => {
       });
     }
 
-    const user = users[userIndex];
+    // Update user with push token using modern database system
+    await db.updateUserPushToken(id, expoPushToken);
 
-    // Update only provided fields
-    const updatedUser = {
-      ...user,
-      ...(fullName && { fullName }),
-      ...(bio !== undefined && { bio }),
-      ...(location !== undefined && { location }),
-      ...(website !== undefined && { website }),
-      ...(avatar !== undefined && { avatar }),
-      updatedAt: new Date().toISOString()
-    };
-
-    users[userIndex] = updatedUser;
-    await writeJson('users.json', users);
-
-    // Remove sensitive fields from response
-    const { ...responseUser } = updatedUser;
+    // Register device with notification service
+    try {
+      await registerDevice(expoPushToken, id);
+    } catch (registrationError) {
+      console.warn('Failed to register device with notification service:', registrationError);
+      // Don't fail the request if registration fails
+    }
 
     res.status(200).json({
       success: true,
-      message: 'Profile updated successfully',
-      data: responseUser,
+      message: 'Push token registered successfully',
+      data: {
+        userId: id,
+        expoPushToken: expoPushToken
+      },
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('Error registering push token:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Something went wrong',
+      timestamp: new Date().toISOString()
+    });
+  }
+};
+
+/**
+ * Update user profile
+ * PUT /users/:id
+ */
+const updateUserProfile = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const updates = req.body;
+
+    // Validate the updates
+    const validationResult = validateProfileUpdateData(updates);
+    if (!validationResult.isValid) {
+      return res.status(400).json({
+        success: false,
+        message: 'Validation failed',
+        errors: validationResult.errors,
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    // Check if user exists
+    const existingUser = await db.getUserById(id);
+    if (!existingUser) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found',
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    // Update user using modern database system
+    const updatedUser = await db.updateUser(id, validationResult.cleanData);
+
+    // Get friend count for response
+    const friends = await db.getUserFriends(id);
+
+    const userResponse = {
+      id: updatedUser.id,
+      fullName: updatedUser.fullName,
+      email: updatedUser.email,
+      bio: updatedUser.bio,
+      location: updatedUser.location,
+      website: updatedUser.website,
+      avatar: updatedUser.avatar,
+      createdAt: updatedUser.createdAt,
+      updatedAt: updatedUser.updatedAt,
+      friendsCount: friends.length,
+    };
+
+    res.status(200).json({
+      success: true,
+      message: 'User profile updated successfully',
+      data: userResponse,
       timestamp: new Date().toISOString()
     });
 
