@@ -615,7 +615,9 @@ class DatabaseService {
 
   async getUserGroups(userId) {
     return await this.getMany(`
-      SELECT g.*, gm.role, gm.joinedAt FROM groups g
+      SELECT g.*, gm.role, gm.joinedAt,
+             (SELECT COUNT(*) FROM group_members gm2 WHERE gm2.groupId = g.id) as memberCount
+      FROM groups g
       INNER JOIN group_members gm ON g.id = gm.groupId
       WHERE gm.userId = ?
       ORDER BY g.name

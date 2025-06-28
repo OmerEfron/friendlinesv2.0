@@ -431,6 +431,7 @@ const getUserGroups = async (req, res) => {
       joinedAt: group.joinedAt,
       createdAt: group.createdAt,
       updatedAt: group.updatedAt,
+      memberCount: group.memberCount,
     }));
 
     res.status(200).json({

@@ -35,11 +35,11 @@ const initializeDevData = async () => {
       // Check if friends already exist and are connected
       const existingFriends = await db.getUserFriends(testUser.id);
       if (existingFriends.length >= 3) {
-        console.log("✅ Test data already initialized");
-        return;
+        console.log("✅ Friends already exist, continuing with group and post initialization...");
+        // Don't return early - continue to check groups and posts
+      } else {
+        console.log("📝 Adding missing test friends...");
       }
-      
-      console.log("📝 Adding missing test friends...");
     }
 
     // Check if someone else already has the test email
@@ -187,6 +187,24 @@ const initializeDevData = async () => {
       console.log("✅ Created test group");
     } else {
       console.log("✅ Test group already exists");
+    }
+
+    // Add Alice and Bob to the test group as members
+    const membersToAdd = [
+      { user: createdFriends[0], name: "Alice Johnson" }, // Alice
+      { user: createdFriends[1], name: "Bob Smith" }      // Bob
+    ];
+
+    for (const memberInfo of membersToAdd) {
+      if (memberInfo.user) {
+        const isAlreadyMember = await db.isUserInGroup(testGroup.id, memberInfo.user.id);
+        if (!isAlreadyMember) {
+          await db.addUserToGroup(testGroup.id, memberInfo.user.id, 'member');
+          console.log(`✅ Added ${memberInfo.name} to test group`);
+        } else {
+          console.log(`✅ ${memberInfo.name} is already in test group`);
+        }
+      }
     }
 
     // Create some test posts (only if they don't already exist)
