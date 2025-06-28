@@ -12,6 +12,9 @@ const initializeDevData = async () => {
   try {
     console.log("🛠️  Initializing development data...");
 
+    // Ensure database is initialized
+    await db.initialize();
+
     // Check if test user already exists
     const testUser = await db.getUserById("utest123456789");
     
@@ -42,13 +45,15 @@ const initializeDevData = async () => {
     // Check if someone else already has the test email
     const emailUser = await db.getUserByEmail("test@example.com");
     if (emailUser && emailUser.id !== "utest123456789") {
-      console.log("⚠️ User with test@example.com already exists but has different ID. Skipping test user creation.");
-      return;
+      console.log("⚠️ User with test@example.com already exists but has different ID. Removing existing user and creating correct one...");
+      // Delete the existing user to create the correct one
+      await db.runQuery('DELETE FROM users WHERE id = ?', [emailUser.id]);
+      console.log(`✅ Removed existing user with ID: ${emailUser.id}`);
     }
 
     console.log("📝 Creating comprehensive test data...");
 
-    // Create main test user with specific ID for frontend compatibility (only if doesn't exist)
+    // Create main test user with specific ID for frontend compatibility
     let mainTestUser = testUser;
     if (!mainTestUser) {
       mainTestUser = await db.createUserWithId('utest123456789', {
@@ -59,6 +64,8 @@ const initializeDevData = async () => {
         website: "https://testuser.dev"
       });
       console.log("✅ Created main test user with ID: utest123456789");
+    } else {
+      console.log("✅ Test user with correct ID already exists");
     }
 
     // Create friend users
@@ -102,16 +109,31 @@ const initializeDevData = async () => {
 
     const createdFriends = [];
     for (const userData of friendUserData) {
-      const friend = await db.createUser(userData);
+      // Check if friend user already exists
+      let friend = await db.getUserByEmail(userData.email);
+      if (!friend) {
+        friend = await db.createUser(userData);
+        console.log(`✅ Created friend user: ${friend.fullName}`);
+      } else {
+        console.log(`✅ Friend user already exists: ${friend.fullName}`);
+      }
       createdFriends.push(friend);
-      console.log(`✅ Created friend user: ${friend.fullName}`);
     }
 
     // Create friendships between main user and friends
     for (const friend of createdFriends) {
-      await db.sendFriendRequest(mainTestUser.id, friend.id);
-      await db.acceptFriendRequest(mainTestUser.id, friend.id);
-      console.log(`✅ Created friendship: ${mainTestUser.fullName} ↔ ${friend.fullName}`);
+      // Check if friendship already exists
+      const existingFriendship = await db.getFriendshipStatus(mainTestUser.id, friend.id);
+      if (!existingFriendship) {
+        await db.sendFriendRequest(mainTestUser.id, friend.id);
+        await db.acceptFriendRequest(mainTestUser.id, friend.id);
+        console.log(`✅ Created friendship: ${mainTestUser.fullName} ↔ ${friend.fullName}`);
+      } else if (existingFriendship.status === 'pending') {
+        await db.acceptFriendRequest(mainTestUser.id, friend.id);
+        console.log(`✅ Accepted existing friend request: ${mainTestUser.fullName} ↔ ${friend.fullName}`);
+      } else {
+        console.log(`✅ Friendship already exists: ${mainTestUser.fullName} ↔ ${friend.fullName}`);
+      }
     }
 
     // Create some friend requests (pending)
@@ -133,40 +155,68 @@ const initializeDevData = async () => {
     ];
 
     for (const userData of pendingUserData) {
-      const pendingUser = await db.createUser(userData);
-      await db.sendFriendRequest(pendingUser.id, mainTestUser.id);
-      console.log(`✅ Created pending friend request from: ${pendingUser.fullName}`);
+      // Check if pending user already exists
+      let pendingUser = await db.getUserByEmail(userData.email);
+      if (!pendingUser) {
+        pendingUser = await db.createUser(userData);
+        console.log(`✅ Created pending user: ${pendingUser.fullName}`);
+      } else {
+        console.log(`✅ Pending user already exists: ${pendingUser.fullName}`);
+      }
+      
+      // Check if friend request already exists before sending
+      const existingFriendship = await db.getFriendshipStatus(pendingUser.id, mainTestUser.id);
+      if (!existingFriendship) {
+        await db.sendFriendRequest(pendingUser.id, mainTestUser.id);
+        console.log(`✅ Created pending friend request from: ${pendingUser.fullName}`);
+      } else {
+        console.log(`✅ Friend request already exists from: ${pendingUser.fullName}`);
+      }
     }
 
     // Create a test group
-    const testGroup = await db.createGroup({
-      name: "Tech Enthusiasts",
-      description: "A community for discussing technology and programming",
-      ownerId: mainTestUser.id
-    });
-    console.log("✅ Created test group");
+    const userGroups = await db.getUserGroups(mainTestUser.id);
+    let testGroup = userGroups.find(group => group.name === "Tech Enthusiasts");
+    
+    if (!testGroup) {
+      testGroup = await db.createGroup({
+        name: "Tech Enthusiasts",
+        description: "A community for discussing technology and programming",
+        ownerId: mainTestUser.id
+      });
+      console.log("✅ Created test group");
+    } else {
+      console.log("✅ Test group already exists");
+    }
 
-    // Create some test posts
-    const testPosts = [
-      {
+    // Create some test posts (only if they don't already exist)
+    const existingTestUserPosts = await db.getUserPosts(mainTestUser.id);
+    const existingAlicePosts = createdFriends.length > 0 ? await db.getUserPosts(createdFriends[0].id) : [];
+    
+    if (existingTestUserPosts.length === 0) {
+      await db.createPost({
         userId: mainTestUser.id,
         rawText: "Just finished setting up the development environment! 🚀",
         generatedText: "BREAKING: Test User just finished setting up the development environment! 🚀",
         audienceType: "public",
         groupIds: []
-      },
-      {
+      });
+      console.log(`✅ Created test post by: ${mainTestUser.fullName}`);
+    } else {
+      console.log(`✅ Test posts already exist for: ${mainTestUser.fullName}`);
+    }
+
+    if (createdFriends.length > 0 && existingAlicePosts.length === 0) {
+      await db.createPost({
         userId: createdFriends[0].id,
         rawText: "Great day for coding! ☕",
         generatedText: "URGENT: Alice reports great day for coding! ☕",
         audienceType: "friends",
         groupIds: []
-      }
-    ];
-
-    for (const postData of testPosts) {
-      await db.createPost(postData);
-      console.log(`✅ Created test post by: ${postData.userId}`);
+      });
+      console.log(`✅ Created test post by: ${createdFriends[0].fullName}`);
+    } else if (createdFriends.length > 0) {
+      console.log(`✅ Test posts already exist for: ${createdFriends[0].fullName}`);
     }
 
     console.log("🎉 Development data initialization completed successfully!");
