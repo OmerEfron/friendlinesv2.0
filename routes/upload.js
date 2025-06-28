@@ -2,6 +2,7 @@ const express = require('express');
 const { upload, uploadAvatar } = require('../controllers/uploadController');
 const { validateIdMiddleware } = require('../middleware/validation');
 const { createCustomLimiter } = require('../middleware/rateLimiter');
+const { authenticateToken } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -18,6 +19,7 @@ const uploadLimiter = createCustomLimiter({
 
 // Upload avatar
 router.post('/avatar/:id',
+  authenticateToken, // Require authentication
   uploadLimiter,
   validateIdMiddleware("id"),
   upload.single('avatar'),

@@ -28,18 +28,19 @@ const {
 const {
   getGeneralLimiter,
 } = require("../middleware/rateLimiter");
+const { authenticateToken, optionalAuth } = require("../middleware/auth");
 
 // Apply general rate limiting to all group routes
 router.use(getGeneralLimiter());
 
 /**
- * POST /groups/:userId
+ * POST /groups
  * Create a new group
  * Body: { name, description }
  */
 router.post(
-  "/:userId",
-  validateUserIdMiddleware, // Validate user ID parameter
+  "/",
+  authenticateToken, // Require authentication
   validateContentType, // Ensure JSON content type
   ensureBodyExists, // Ensure request body exists
   validateGroupMiddleware, // Validate and sanitize group data
@@ -49,10 +50,11 @@ router.post(
 /**
  * POST /groups/:id/invite
  * Invite users to a group
- * Body: { userIds, userId }
+ * Body: { userIds }
  */
 router.post(
   "/:id/invite",
+  authenticateToken, // Require authentication
   validateIdMiddleware("id"), // Validate group ID parameter
   validateContentType, // Ensure JSON content type
   ensureBodyExists, // Ensure request body exists
@@ -63,38 +65,32 @@ router.post(
 /**
  * POST /groups/:id/accept
  * Accept a group invitation
- * Body: { userId }
  */
 router.post(
   "/:id/accept",
+  authenticateToken, // Require authentication
   validateIdMiddleware("id"), // Validate group ID parameter
-  validateContentType, // Ensure JSON content type
-  ensureBodyExists, // Ensure request body exists
-  validateUserActionMiddleware, // Validate and sanitize user action data
   acceptInvitation // Controller function
 );
 
 /**
  * POST /groups/:id/leave
  * Leave a group
- * Body: { userId }
  */
 router.post(
   "/:id/leave",
+  authenticateToken, // Require authentication
   validateIdMiddleware("id"), // Validate group ID parameter
-  validateContentType, // Ensure JSON content type
-  ensureBodyExists, // Ensure request body exists
-  validateUserActionMiddleware, // Validate and sanitize user action data
   leaveGroup // Controller function
 );
 
 /**
  * GET /groups/:id
  * Get group details
- * Query params: userId (optional, for access control)
  */
 router.get(
   "/:id",
+  optionalAuth, // Optional auth for access control
   validateIdMiddleware("id"), // Validate group ID parameter
   getGroup // Controller function
 );
@@ -105,6 +101,7 @@ router.get(
  */
 router.get(
   "/user/:userId",
+  authenticateToken, // Require authentication
   validateUserIdMiddleware, // Validate user ID parameter
   getUserGroups // Controller function
 );
@@ -112,10 +109,11 @@ router.get(
 /**
  * GET /groups/:id/posts
  * Get posts for a specific group
- * Query params: userId (required for access control), page, limit
+ * Query params: page, limit
  */
 router.get(
   "/:id/posts",
+  authenticateToken, // Require authentication for group access
   validateIdMiddleware("id"), // Validate group ID parameter
   getGroupPosts // Controller function
 );

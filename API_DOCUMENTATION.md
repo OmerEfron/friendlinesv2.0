@@ -206,9 +206,21 @@ npx openapi-typescript http://localhost:3000/api-docs/swagger.json --output type
 
 ## 📝 Adding New Endpoints
 
-When adding new endpoints, follow this pattern:
+We provide comprehensive guides for documenting new API routes:
 
-1. **Add route with Swagger documentation**:
+### 📚 Documentation Guides
+- **[Complete Guide](docs/HOW_TO_DOCUMENT_NEW_ROUTES.md)** - Step-by-step instructions with examples
+- **[AI Prompt Template](docs/AI_PROMPT_TEMPLATE.md)** - Use AI to generate documentation quickly
+
+### 🚀 Quick Process
+1. **Write your Express route**
+2. **Generate documentation** using our AI prompt template or manual guide
+3. **Add @swagger comment** directly above your route
+4. **Run validation**: `npm run docs:generate`
+5. **Test in browser**: `http://localhost:3000/api-docs`
+6. **Commit your changes**
+
+### 📋 Quick Template
 ```javascript
 /**
  * @swagger
@@ -237,9 +249,7 @@ When adding new endpoints, follow this pattern:
 router.post('/your-endpoint', yourController);
 ```
 
-2. **Update Swagger schemas** in `swaggerDef.js` if needed
-3. **Test the endpoint** in `/api-docs`
-4. **Update this documentation** if it's a major feature
+For detailed examples and best practices, see our [complete documentation guide](docs/HOW_TO_DOCUMENT_NEW_ROUTES.md).
 
 ## 🐛 Debugging
 

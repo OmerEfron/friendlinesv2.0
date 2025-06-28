@@ -35,11 +35,22 @@ const upload = multer({
 const uploadAvatar = async (req, res, next) => {
   try {
     const { id } = req.params;
+    const authenticatedUserId = req.user.id;
 
     if (!isValidId(id)) {
       return res.status(400).json({
         success: false,
         message: 'Invalid user ID format',
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    // Check if the authenticated user is uploading their own avatar
+    if (id !== authenticatedUserId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied',
+        error: 'You can only upload your own avatar',
         timestamp: new Date().toISOString()
       });
     }

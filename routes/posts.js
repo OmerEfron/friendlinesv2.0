@@ -31,6 +31,7 @@ const {
   postUpdateLimiter,
   getGeneralLimiter,
 } = require("../middleware/rateLimiter");
+const { authenticateToken, optionalAuth } = require("../middleware/auth");
 
 // Apply general rate limiting to all post routes
 router.use(getGeneralLimiter());
@@ -40,7 +41,7 @@ router.use(getGeneralLimiter());
  * Get all posts with pagination and audience filtering
  * Query params: page, limit, currentUserId
  */
-router.get("/", getAllPosts);
+router.get("/", optionalAuth, getAllPosts);
 
 /**
  * GET /posts/dev
@@ -55,6 +56,7 @@ router.get("/dev", getAllPostsDev);
  */
 router.get(
   "/:userId",
+  optionalAuth, // Optional auth to show appropriate content
   validateIdMiddleware("userId"), // Validate user ID parameter
   getPostsByUser // Controller function
 );
@@ -62,10 +64,11 @@ router.get(
 /**
  * POST /posts
  * Create a new post
- * Body: { rawText, userId, audienceType, targetFriendId?, groupIds?, generate?, tone?, length?, temperature? }
+ * Body: { rawText, audienceType, targetFriendId?, groupIds?, generate?, tone?, length?, temperature? }
  */
 router.post(
   "/",
+  authenticateToken, // Require authentication
   postCreationLimiter, // Rate limiting for post creation
   validateContentType, // Ensure JSON content type
   ensureBodyExists, // Ensure request body exists
@@ -80,6 +83,7 @@ router.post(
  */
 router.put(
   "/:id",
+  authenticateToken, // Require authentication
   postUpdateLimiter, // Rate limiting for post updates
   validateIdMiddleware("id"), // Validate post ID parameter
   validateContentType, // Ensure JSON content type
@@ -91,13 +95,11 @@ router.put(
 /**
  * DELETE /posts/:id
  * Delete a post
- * Body: { userId }
  */
 router.delete(
   "/:id",
+  authenticateToken, // Require authentication
   validateIdMiddleware("id"), // Validate post ID parameter
-  validateContentType, // Ensure JSON content type
-  ensureBodyExists, // Ensure request body exists
   deletePost // Controller function
 );
 
@@ -107,6 +109,7 @@ router.delete(
  */
 router.get(
   "/:id/details",
+  optionalAuth, // Optional auth to show appropriate content
   validateIdMiddleware("id"), // Validate post ID parameter
   getPostById // Controller function
 );
@@ -128,6 +131,7 @@ router.get(
  */
 router.post(
   "/preview",
+  authenticateToken, // Require authentication
   postCreationLimiter, // Use same rate limit as post creation
   validateContentType, // Ensure JSON content type
   ensureBodyExists, // Ensure request body exists

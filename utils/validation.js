@@ -134,12 +134,7 @@ const validatePostData = (postData) => {
     return { isValid: false, errors };
   }
 
-  const { rawText, userId, audienceType, targetFriendId, groupIds, generate } = postData;
-
-  // Validate user ID
-  if (!userId || typeof userId !== "string" || userId.trim().length === 0) {
-    errors.push("User ID is required");
-  }
+  const { rawText, audienceType, targetFriendId, groupIds, generate } = postData;
 
   // Validate post text
   const textValidation = validatePostText(rawText);
@@ -213,7 +208,6 @@ const validatePostData = (postData) => {
     errors,
     sanitizedData: {
       rawText: rawText ? rawText.trim() : "",
-      userId: userId ? userId.trim() : "",
       audienceType: audienceType ? audienceType.trim() : undefined,
       targetFriendId: targetFriendId ? targetFriendId.trim() : undefined,
       groupIds: groupIds ? groupIds.map(id => id.trim()).filter(Boolean) : [],
@@ -313,12 +307,7 @@ const validateInviteData = (inviteData) => {
     return { isValid: false, errors };
   }
 
-  const { userIds, userId } = inviteData;
-
-  // Validate userId (current user)
-  if (!userId || typeof userId !== "string" || userId.trim().length === 0) {
-    errors.push("User ID is required");
-  }
+  const { userIds } = inviteData;
 
   // Validate userIds array
   if (!userIds || !Array.isArray(userIds)) {
@@ -350,7 +339,6 @@ const validateInviteData = (inviteData) => {
     errors,
     sanitizedData: {
       userIds: userIds ? userIds.map(id => id.trim()) : [],
-      userId: userId ? userId.trim() : "",
     },
   };
 };

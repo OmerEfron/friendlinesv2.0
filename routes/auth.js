@@ -11,14 +11,6 @@ const {
   getAllUsers,
   checkUserExists,
   getUserStats,
-  sendFriendRequest,
-  acceptFriendRequest,
-  rejectFriendRequest,
-  cancelFriendRequest,
-  removeFriendship,
-  getFriends,
-  getPendingRequests,
-  getFriendshipStatus,
   registerPushToken,
   updateUserProfile,
 } = require("../controllers/authController");
@@ -36,6 +28,7 @@ const {
   getGeneralLimiter,
   createCustomLimiter,
 } = require("../middleware/rateLimiter");
+const { authenticateToken } = require("../middleware/auth");
 
 // Apply general rate limiting to all auth routes
 router.use(getGeneralLimiter());
@@ -185,119 +178,24 @@ router.get(
 );
 
 /**
- * POST /users/:id/friend-request
- * Send friend request to a user
- * Body: { userId }
- */
-router.post(
-  "/users/:id/friend-request",
-  validateIdMiddleware("id"), // Validate user ID parameter
-  validateContentType, // Ensure JSON content type
-  ensureBodyExists, // Ensure request body exists
-  sendFriendRequest // Controller function
-);
-
-/**
- * POST /users/:id/accept-friend
- * Accept friend request from a user
- * Body: { userId }
- */
-router.post(
-  "/users/:id/accept-friend",
-  validateIdMiddleware("id"), // Validate user ID parameter
-  validateContentType, // Ensure JSON content type
-  ensureBodyExists, // Ensure request body exists
-  acceptFriendRequest // Controller function
-);
-
-/**
- * POST /users/:id/reject-friend
- * Reject friend request from a user
- * Body: { userId }
- */
-router.post(
-  "/users/:id/reject-friend",
-  validateIdMiddleware("id"), // Validate user ID parameter
-  validateContentType, // Ensure JSON content type
-  ensureBodyExists, // Ensure request body exists
-  rejectFriendRequest // Controller function
-);
-
-/**
- * POST /users/:id/cancel-friend-request
- * Cancel sent friend request
- * Body: { userId }
- */
-router.post(
-  "/users/:id/cancel-friend-request",
-  validateIdMiddleware("id"), // Validate user ID parameter
-  validateContentType, // Ensure JSON content type
-  ensureBodyExists, // Ensure request body exists
-  cancelFriendRequest // Controller function
-);
-
-/**
- * POST /users/:id/unfriend
- * Remove friendship with a user
- * Body: { userId }
- */
-router.post(
-  "/users/:id/unfriend",
-  validateIdMiddleware("id"), // Validate user ID parameter
-  validateContentType, // Ensure JSON content type
-  ensureBodyExists, // Ensure request body exists
-  removeFriendship // Controller function
-);
-
-/**
- * GET /users/:id/friends
- * Get friends for a user
- * Query params: page, limit
- */
-router.get(
-  "/users/:id/friends",
-  validateIdMiddleware("id"), // Validate user ID parameter
-  getFriends // Controller function
-);
-
-/**
- * GET /users/:id/friend-requests
- * Get pending friend requests for a user
- * Query params: page, limit, type (received|sent)
- */
-router.get(
-  "/users/:id/friend-requests",
-  validateIdMiddleware("id"), // Validate user ID parameter
-  getPendingRequests // Controller function
-);
-
-/**
- * GET /users/:id/friendship-status
- * Get friendship status between two users
- * Query params: userId (current user ID)
- */
-router.get(
-  "/users/:id/friendship-status",
-  validateIdMiddleware("id"), // Validate user ID parameter
-  getFriendshipStatus // Controller function
-);
-
-/**
  * POST /users/:id/push-token
  * Register push notification token for a user
  * Body: { expoPushToken }
  */
 router.post(
-  "/users/:id/push-token",
-  validateIdMiddleware("id"), // Validate user ID parameter
+  "/push-token",
+  authenticateToken, // Require authentication
   validateContentType, // Ensure JSON content type
   ensureBodyExists, // Ensure request body exists
   registerPushToken // Controller function
 );
 
 // Update user profile
-router.put('/users/:id', 
-  validateIdMiddleware("id"),
+router.put('/profile', 
+  authenticateToken, // Require authentication
+  profileUpdateLimiter,
+  validateContentType,
+  ensureBodyExists,
   validateProfileUpdateMiddleware,
   updateUserProfile
 );

@@ -7,11 +7,11 @@ const { isValidId } = require("../utils/validation");
 
 /**
  * Create a new group
- * POST /groups/:userId
+ * POST /groups
  */
 const createGroup = async (req, res) => {
   try {
-    const { userId } = req.params;
+    const userId = req.user.id; // Get from authenticated user
     const { name, description } = req.body;
 
     // Validate required fields
@@ -82,13 +82,14 @@ const createGroup = async (req, res) => {
 const inviteToGroup = async (req, res) => {
   try {
     const { id } = req.params; // Group ID
-    const { userId, inviterId } = req.body;
+    const { userIds } = req.body; // Array of user IDs to invite
+    const inviterId = req.user.id; // Get from authenticated user
 
     // Validate required fields
-    if (!userId || !inviterId) {
+    if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
       return res.status(400).json({
         success: false,
-        message: "User ID and inviter ID are required",
+        message: "User IDs array is required",
         timestamp: new Date().toISOString(),
       });
     }
@@ -103,16 +104,12 @@ const inviteToGroup = async (req, res) => {
       });
     }
 
-    // Check if users exist
-    const [user, inviter] = await Promise.all([
-      db.getUserById(userId),
-      db.getUserById(inviterId)
-    ]);
-
-    if (!user || !inviter) {
+    // Get inviter user
+    const inviter = await db.getUserById(inviterId);
+    if (!inviter) {
       return res.status(404).json({
         success: false,
-        message: "User or inviter not found",
+        message: "Inviter not found",
         timestamp: new Date().toISOString(),
       });
     }
@@ -127,53 +124,92 @@ const inviteToGroup = async (req, res) => {
       });
     }
 
-    // Check if user is already a member
-    const isAlreadyMember = await db.isUserInGroup(id, userId);
-    if (isAlreadyMember) {
-      return res.status(400).json({
-        success: false,
-        message: "User is already a group member",
-        timestamp: new Date().toISOString(),
-      });
-    }
+    const results = [];
+    const invitedUsers = [];
 
-    // Add user to group
-    await db.addUserToGroup(id, userId);
+    // Process each user invitation
+    for (const userId of userIds) {
+      try {
+        // Check if user exists
+        const user = await db.getUserById(userId);
+        if (!user) {
+          results.push({
+            userId,
+            success: false,
+            error: "User not found"
+          });
+          continue;
+        }
 
-    // Send push notification (non-blocking)
-    try {
-      if (user.expoPushToken) {
-        await sendPush(
-          [user.expoPushToken],
-          "Group Invitation",
-          `${inviter.fullName} added you to ${group.name}`,
-          {
-            type: "group_invitation",
-            groupId: id,
-            groupName: group.name,
-            inviterId: inviterId,
-            inviterName: inviter.fullName
-          },
-          {
-            channelId: "group_invites",
-            priority: "normal"
+        // Check if user is already a member
+        const isAlreadyMember = await db.isUserInGroup(id, userId);
+        if (isAlreadyMember) {
+          results.push({
+            userId,
+            success: false,
+            error: "User is already a group member"
+          });
+          continue;
+        }
+
+        // Add user to group
+        await db.addUserToGroup(id, userId);
+        invitedUsers.push({
+          userId,
+          userName: user.fullName
+        });
+
+        results.push({
+          userId,
+          success: true,
+          userName: user.fullName
+        });
+
+        // Send push notification (non-blocking)
+        try {
+          if (user.expoPushToken) {
+            await sendPush(
+              [user.expoPushToken],
+              "Group Invitation",
+              `${inviter.fullName} added you to ${group.name}`,
+              {
+                type: "group_invitation",
+                groupId: id,
+                groupName: group.name,
+                inviterId: inviterId,
+                inviterName: inviter.fullName
+              },
+              {
+                channelId: "group_invites",
+                priority: "normal"
+              }
+            );
           }
-        );
+        } catch (notificationError) {
+          console.error("Notification error (non-blocking):", notificationError);
+        }
+      } catch (error) {
+        results.push({
+          userId,
+          success: false,
+          error: error.message
+        });
       }
-    } catch (notificationError) {
-      console.error("Notification error (non-blocking):", notificationError);
     }
+
+    const successCount = results.filter(r => r.success).length;
 
     res.status(200).json({
       success: true,
-      message: "User added to group successfully",
+      message: `${successCount} users invited to group successfully`,
       data: {
         groupId: id,
         groupName: group.name,
-        userId: userId,
-        userName: user.fullName,
         inviterId: inviterId,
         inviterName: inviter.fullName,
+        invitedUsers,
+        pendingInvites: successCount,
+        results
       },
       timestamp: new Date().toISOString(),
     });
@@ -198,15 +234,9 @@ const inviteToGroup = async (req, res) => {
 const acceptInvitation = async (req, res) => {
   try {
     const { id } = req.params; // Group ID
-    const { userId } = req.body;
+    const userId = req.user.id; // Get from authenticated user
 
-    if (!userId) {
-      return res.status(400).json({
-        success: false,
-        message: "User ID is required",
-        timestamp: new Date().toISOString(),
-      });
-    }
+
 
     // Check if group exists
     const group = await db.getGroupById(id);
@@ -273,15 +303,7 @@ const acceptInvitation = async (req, res) => {
 const leaveGroup = async (req, res) => {
   try {
     const { id } = req.params; // Group ID
-    const { userId } = req.body;
-
-    if (!userId) {
-      return res.status(400).json({
-        success: false,
-        message: "User ID is required",
-        timestamp: new Date().toISOString(),
-      });
-    }
+    const userId = req.user.id; // Get from authenticated user
 
     // Check if group exists
     const group = await db.getGroupById(id);
@@ -407,6 +429,17 @@ const getGroup = async (req, res) => {
 const getUserGroups = async (req, res) => {
   try {
     const { userId } = req.params;
+    const authenticatedUserId = req.user.id;
+
+    // Check if the authenticated user is requesting their own groups or has permission
+    if (userId !== authenticatedUserId) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied",
+        error: "You can only access your own groups",
+        timestamp: new Date().toISOString(),
+      });
+    }
 
     // Check if user exists
     const user = await db.getUserById(userId);
@@ -461,16 +494,8 @@ const getUserGroups = async (req, res) => {
 const getGroupPosts = async (req, res) => {
   try {
     const { id } = req.params; // Group ID
-    const { userId, page = 1, limit = 10 } = req.query;
-
-    // Validate required userId for access control
-    if (!userId) {
-      return res.status(400).json({
-        success: false,
-        message: "User ID is required for access control",
-        timestamp: new Date().toISOString(),
-      });
-    }
+    const { page = 1, limit = 10 } = req.query;
+    const userId = req.user.id; // Get from authenticated user
 
     // Check if group exists
     const group = await db.getGroupById(id);

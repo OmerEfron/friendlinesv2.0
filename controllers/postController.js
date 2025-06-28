@@ -15,7 +15,7 @@ const getAllPosts = async (req, res) => {
   try {
     // Validate pagination parameters
     const { page, limit } = validatePaginationParams(req.query);
-    const currentUserId = req.body.currentUserId || req.query.currentUserId; // For authenticated requests
+    const currentUserId = req.user?.id; // Get from authenticated user
 
     // Calculate offset for pagination
     const offset = (page - 1) * limit;
@@ -80,7 +80,7 @@ const getPostsByUser = async (req, res) => {
   try {
     const { userId } = req.params;
     const { page, limit } = validatePaginationParams(req.query);
-    const currentUserId = req.body.currentUserId || req.query.currentUserId;
+    const currentUserId = req.user?.id; // Get from authenticated user
 
     // Calculate offset for pagination
     const offset = (page - 1) * limit;
@@ -153,10 +153,9 @@ const getPostsByUser = async (req, res) => {
  */
 const createPost = async (req, res) => {
   try {
-    // Get validated data from middleware
+    // Get validated data from middleware and authenticated user
     const {
       rawText,
-      userId,
       audienceType,
       targetFriendId,
       groupIds,
@@ -165,6 +164,7 @@ const createPost = async (req, res) => {
       length,
       temperature,
     } = req.validatedData;
+    const userId = req.user.id; // Get from authenticated user
 
     // Find the user using modern database system
     const user = await db.getUserById(userId);
@@ -429,6 +429,7 @@ const updatePost = async (req, res) => {
   try {
     const { id } = req.params;
     const { rawText } = req.validatedData;
+    const userId = req.user.id; // Get from authenticated user
 
     // Get the existing post using modern database
     const post = await db.getPostById(id);
@@ -437,6 +438,16 @@ const updatePost = async (req, res) => {
         success: false,
         message: "Post not found",
         error: "No post found with the provided ID",
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    // Check if the authenticated user owns the post
+    if (post.userId !== userId) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied",
+        error: "You can only update your own posts",
         timestamp: new Date().toISOString(),
       });
     }
@@ -552,6 +563,7 @@ const updatePost = async (req, res) => {
 const deletePost = async (req, res) => {
   try {
     const { id } = req.params;
+    const userId = req.user.id; // Get from authenticated user
 
     // Check if post exists using modern database
     const post = await db.getPostById(id);
@@ -560,6 +572,16 @@ const deletePost = async (req, res) => {
         success: false,
         message: "Post not found",
         error: "No post found with the provided ID",
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    // Check if the authenticated user owns the post
+    if (post.userId !== userId) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied",
+        error: "You can only delete your own posts",
         timestamp: new Date().toISOString(),
       });
     }
@@ -575,7 +597,7 @@ const deletePost = async (req, res) => {
       });
     }
 
-    console.log(`Post deleted: ${id}`);
+    console.log(`Post deleted: ${id} by user ${userId}`);
 
     res.status(200).json({
       success: true,
@@ -768,7 +790,8 @@ const getMostActiveUser = (posts, users) => {
  */
 const generateNewsflashPreview = async (req, res) => {
   try {
-    const { rawText, userId, tone, length, temperature } = req.body;
+    const { rawText, tone, length, temperature } = req.body;
+    const userId = req.user.id; // Get from authenticated user
 
     // Basic validation
     if (!rawText || typeof rawText !== 'string' || rawText.trim().length === 0) {
@@ -776,15 +799,6 @@ const generateNewsflashPreview = async (req, res) => {
         success: false,
         message: "Raw text is required",
         error: "Please provide valid text content",
-        timestamp: new Date().toISOString(),
-      });
-    }
-
-    if (!userId) {
-      return res.status(400).json({
-        success: false,
-        message: "User ID is required",
-        error: "Please provide a valid user ID",
         timestamp: new Date().toISOString(),
       });
     }

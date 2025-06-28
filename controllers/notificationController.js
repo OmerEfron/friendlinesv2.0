@@ -8,11 +8,22 @@ const getUserNotifications = async (req, res, next) => {
   try {
     const { id } = req.params;
     const { page = 1, limit = 20, unreadOnly = false } = req.query;
+    const authenticatedUserId = req.user.id;
 
     if (!isValidId(id)) {
       return res.status(400).json({
         success: false,
         message: 'Invalid user ID format',
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    // Check if the authenticated user is requesting their own notifications
+    if (id !== authenticatedUserId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied',
+        error: 'You can only access your own notifications',
         timestamp: new Date().toISOString()
       });
     }
@@ -52,12 +63,13 @@ const getUserNotifications = async (req, res, next) => {
  */
 const markNotificationsAsRead = async (req, res, next) => {
   try {
-    const { notificationIds, userId } = req.body;
+    const { notificationIds } = req.body;
+    const userId = req.user.id; // Get from authenticated user
 
-    if (!Array.isArray(notificationIds) || !isValidId(userId)) {
+    if (!Array.isArray(notificationIds)) {
       return res.status(400).json({
         success: false,
-        message: 'Invalid notification IDs or user ID format',
+        message: 'Invalid notification IDs format',
         timestamp: new Date().toISOString()
       });
     }

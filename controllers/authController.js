@@ -4,6 +4,7 @@
 const { db } = require("../utils/database");
 const { isValidId, validateProfileUpdateData, validatePaginationParams } = require("../utils/validation");
 const { registerDevice, sendPush, getFriendTokens } = require("../utils/notificationService");
+const { generateToken } = require("../middleware/auth");
 
 /**
  * Handle user login (create or retrieve user)
@@ -40,6 +41,9 @@ const login = async (req, res) => {
     const friends = await db.getUserFriends(user.id);
     const friendsCount = friends.length;
 
+    // Generate JWT token
+    const token = generateToken(user);
+
     // Return user data (excluding sensitive info, though there's none in this POC)
     const userResponse = {
       id: user.id,
@@ -58,6 +62,7 @@ const login = async (req, res) => {
           ? "User created successfully"
           : "User logged in successfully",
       data: userResponse,
+      token: token,
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
@@ -1017,7 +1022,7 @@ const getFriendshipStatus = async (req, res) => {
  */
 const registerPushToken = async (req, res) => {
   try {
-    const { id } = req.params;
+    const userId = req.user.id; // Get from authenticated user
     const { expoPushToken } = req.body;
 
     if (!expoPushToken || typeof expoPushToken !== 'string') {
@@ -1029,7 +1034,7 @@ const registerPushToken = async (req, res) => {
     }
 
     // Check if user exists
-    const user = await db.getUserById(id);
+    const user = await db.getUserById(userId);
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -1039,11 +1044,11 @@ const registerPushToken = async (req, res) => {
     }
 
     // Update user with push token using modern database system
-    await db.updateUser(id, { expoPushToken });
+    await db.updateUser(userId, { expoPushToken });
 
     // Register device with notification service
     try {
-      await registerDevice(expoPushToken, id);
+      await registerDevice(expoPushToken, userId);
     } catch (registrationError) {
       console.warn('Failed to register device with notification service:', registrationError);
       // Don't fail the request if registration fails
@@ -1053,7 +1058,7 @@ const registerPushToken = async (req, res) => {
       success: true,
       message: 'Push token registered successfully',
       data: {
-        userId: id,
+        userId: userId,
         expoPushToken: expoPushToken
       },
       timestamp: new Date().toISOString()
@@ -1076,7 +1081,7 @@ const registerPushToken = async (req, res) => {
  */
 const updateUserProfile = async (req, res, next) => {
   try {
-    const { id } = req.params;
+    const userId = req.user.id; // Get from authenticated user
     const updates = req.body;
 
     // Validate the updates
@@ -1091,7 +1096,7 @@ const updateUserProfile = async (req, res, next) => {
     }
 
     // Check if user exists
-    const existingUser = await db.getUserById(id);
+    const existingUser = await db.getUserById(userId);
     if (!existingUser) {
       return res.status(404).json({
         success: false,
@@ -1101,10 +1106,10 @@ const updateUserProfile = async (req, res, next) => {
     }
 
     // Update user using modern database system
-    const updatedUser = await db.updateUser(id, validationResult.cleanData);
+    const updatedUser = await db.updateUser(userId, validationResult.cleanData);
 
     // Get friend count for response
-    const friends = await db.getUserFriends(id);
+    const friends = await db.getUserFriends(userId);
 
     const userResponse = {
       id: updatedUser.id,
@@ -1138,14 +1143,6 @@ module.exports = {
   getAllUsers,
   checkUserExists,
   getUserStats,
-  sendFriendRequest,
-  acceptFriendRequest,
-  rejectFriendRequest,
-  cancelFriendRequest,
-  removeFriendship,
-  getFriends,
-  getPendingRequests,
-  getFriendshipStatus,
   registerPushToken,
   updateUserProfile
 };
