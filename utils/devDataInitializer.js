@@ -13,10 +13,10 @@ const initializeDevData = async () => {
     console.log("🛠️  Initializing development data...");
 
     // Check if test user already exists
-    const testUser = await db.getUserByEmail("test@example.com");
+    const testUser = await db.getUserById("utest123456789");
     
     if (testUser) {
-      console.log("✅ Test user already exists, checking friends...");
+      console.log("✅ Test user already exists (ID: utest123456789), checking friends...");
       
       // Update existing test user with missing fields if needed
       const updates = {};
@@ -39,17 +39,27 @@ const initializeDevData = async () => {
       console.log("📝 Adding missing test friends...");
     }
 
+    // Check if someone else already has the test email
+    const emailUser = await db.getUserByEmail("test@example.com");
+    if (emailUser && emailUser.id !== "utest123456789") {
+      console.log("⚠️ User with test@example.com already exists but has different ID. Skipping test user creation.");
+      return;
+    }
+
     console.log("📝 Creating comprehensive test data...");
 
-    // Create main test user
-    const mainTestUser = await db.createUser({
-      fullName: "Test User",
-      email: "test@example.com",
-      bio: "I'm the main test user for Friendlines development! Love coding, coffee, and connecting with friends.",
-      location: "San Francisco, CA",
-      website: "https://testuser.dev"
-    });
-    console.log("✅ Created main test user");
+    // Create main test user with specific ID for frontend compatibility (only if doesn't exist)
+    let mainTestUser = testUser;
+    if (!mainTestUser) {
+      mainTestUser = await db.createUserWithId('utest123456789', {
+        fullName: "Test User",
+        email: "test@example.com",
+        bio: "I'm the main test user for Friendlines development! Love coding, coffee, and connecting with friends.",
+        location: "San Francisco, CA",
+        website: "https://testuser.dev"
+      });
+      console.log("✅ Created main test user with ID: utest123456789");
+    }
 
     // Create friend users
     const friendUserData = [

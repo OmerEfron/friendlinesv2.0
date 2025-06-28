@@ -349,6 +349,19 @@ class DatabaseService {
     return { id, ...userData, createdAt: now, updatedAt: now };
   }
 
+  async createUserWithId(id, userData) {
+    const now = new Date().toISOString();
+    
+    const result = await this.runQuery(
+      `INSERT INTO users (id, fullName, email, bio, location, website, avatar, expoPushToken, createdAt, updatedAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, userData.fullName, userData.email, userData.bio || null, userData.location || null, 
+       userData.website || null, userData.avatar || null, userData.expoPushToken || null, now, now]
+    );
+    
+    return { id, ...userData, createdAt: now, updatedAt: now };
+  }
+
   async getUserById(userId) {
     return await this.getOne('SELECT * FROM users WHERE id = ?', [userId]);
   }

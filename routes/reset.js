@@ -2,60 +2,64 @@
 // Development-only endpoint to clear all data
 
 const express = require("express");
-const router = express.Router();
-const { writeJson } = require("../utils/dbUtils");
+const { db } = require("../utils/database");
 const { resetLimiter } = require("../middleware/rateLimiter");
+
+const router = express.Router();
 
 /**
  * POST /reset
  * Development-only endpoint to clear all data
  * Resets users.json and posts.json to empty arrays
  */
-router.post("/", resetLimiter, async (req, res) => {
+router.post("/", resetLimiter, async (req, res, next) => {
   try {
-    // Only allow in development mode
-    if (process.env.NODE_ENV === "production") {
+    if (process.env.NODE_ENV !== "development") {
       return res.status(403).json({
         success: false,
-        message: "Access denied",
-        error: "Reset endpoint is not available in production",
+        message: "Reset endpoint is only available in development mode",
         timestamp: new Date().toISOString(),
       });
     }
 
     console.log("🔄 Resetting all data...");
 
-    // Reset users.json to empty array
-    await writeJson("users.json", []);
-    console.log("✅ Users data cleared");
+    // Clear all tables using modern database
+    await db.runQuery('DELETE FROM post_likes');
+    await db.runQuery('DELETE FROM post_groups');
+    await db.runQuery('DELETE FROM group_invites');
+    await db.runQuery('DELETE FROM group_members');
+    await db.runQuery('DELETE FROM friendships');
+    await db.runQuery('DELETE FROM notifications');
+    await db.runQuery('DELETE FROM push_receipts');
+    await db.runQuery('DELETE FROM posts');
+    await db.runQuery('DELETE FROM groups');
+    await db.runQuery('DELETE FROM users');
 
-    // Reset posts.json to empty array
-    await writeJson("posts.json", []);
-    console.log("✅ Posts data cleared");
-
-    console.log("🎉 All data has been reset successfully");
+    console.log("✅ All data reset successfully");
 
     res.status(200).json({
       success: true,
       message: "All data has been reset successfully",
       data: {
-        usersCleared: true,
-        postsCleared: true,
-        resetAt: new Date().toISOString(),
+        clearedTables: [
+          'users',
+          'posts', 
+          'groups',
+          'friendships',
+          'group_members',
+          'group_invites',
+          'post_groups',
+          'post_likes',
+          'notifications',
+          'push_receipts'
+        ]
       },
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    console.error("Reset error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Internal server error during reset",
-      error:
-        process.env.NODE_ENV === "development"
-          ? error.message
-          : "Something went wrong",
-      timestamp: new Date().toISOString(),
-    });
+    console.error("Error resetting data:", error);
+    next(error);
   }
 });
 
@@ -63,54 +67,42 @@ router.post("/", resetLimiter, async (req, res) => {
  * GET /reset/status
  * Get information about the reset endpoint and current data state
  */
-router.get("/status", async (req, res) => {
+router.get("/status", resetLimiter, async (req, res, next) => {
   try {
-    // Only allow in development mode
-    if (process.env.NODE_ENV === "production") {
+    if (process.env.NODE_ENV !== "development") {
       return res.status(403).json({
         success: false,
-        message: "Access denied",
-        error: "Reset status endpoint is not available in production",
+        message: "Reset endpoint is only available in development mode",
         timestamp: new Date().toISOString(),
       });
     }
 
-    const { readJson } = require("../utils/dbUtils");
+    // Get counts from all tables
+    const userCount = await db.getMany('SELECT COUNT(*) as count FROM users');
+    const postCount = await db.getMany('SELECT COUNT(*) as count FROM posts');
+    const groupCount = await db.getMany('SELECT COUNT(*) as count FROM groups');
+    const friendshipCount = await db.getMany('SELECT COUNT(*) as count FROM friendships');
+    const notificationCount = await db.getMany('SELECT COUNT(*) as count FROM notifications');
 
-    // Read current data to show status
-    const users = await readJson("users.json");
-    const posts = await readJson("posts.json");
+    const stats = {
+      users: userCount[0]?.count || 0,
+      posts: postCount[0]?.count || 0,
+      groups: groupCount[0]?.count || 0,
+      friendships: friendshipCount[0]?.count || 0,
+      notifications: notificationCount[0]?.count || 0,
+      lastReset: "N/A", // Could be tracked if needed
+      canReset: true,
+    };
 
     res.status(200).json({
       success: true,
       message: "Reset status retrieved successfully",
-      data: {
-        environment: process.env.NODE_ENV || "development",
-        resetAvailable: true,
-        currentData: {
-          totalUsers: users.length,
-          totalPosts: posts.length,
-          isEmpty: users.length === 0 && posts.length === 0,
-        },
-        usage: {
-          endpoint: "POST /reset",
-          description: "Clears all users and posts data",
-          warning: "This action cannot be undone",
-        },
-      },
+      data: stats,
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    console.error("Reset status error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Internal server error getting reset status",
-      error:
-        process.env.NODE_ENV === "development"
-          ? error.message
-          : "Something went wrong",
-      timestamp: new Date().toISOString(),
-    });
+    console.error("Error getting reset status:", error);
+    next(error);
   }
 });
 
@@ -118,44 +110,47 @@ router.get("/status", async (req, res) => {
  * POST /reset/users
  * Development-only endpoint to clear only users data
  */
-router.post("/users", resetLimiter, async (req, res) => {
+router.post("/users", resetLimiter, async (req, res, next) => {
   try {
-    // Only allow in development mode
-    if (process.env.NODE_ENV === "production") {
+    if (process.env.NODE_ENV !== "development") {
       return res.status(403).json({
         success: false,
-        message: "Access denied",
-        error: "Reset users endpoint is not available in production",
+        message: "Reset endpoint is only available in development mode",
         timestamp: new Date().toISOString(),
       });
     }
 
     console.log("🔄 Resetting users data...");
 
-    // Reset users.json to empty array
-    await writeJson("users.json", []);
-    console.log("✅ Users data cleared");
+    // Clear user-related data in proper order (due to foreign key constraints)
+    await db.runQuery('DELETE FROM post_likes');
+    await db.runQuery('DELETE FROM group_members');
+    await db.runQuery('DELETE FROM group_invites');
+    await db.runQuery('DELETE FROM friendships');
+    await db.runQuery('DELETE FROM notifications');
+    await db.runQuery('DELETE FROM posts WHERE userId IN (SELECT id FROM users)');
+    await db.runQuery('DELETE FROM groups WHERE ownerId IN (SELECT id FROM users)');
+    await db.runQuery('DELETE FROM users');
+
+    console.log("✅ Users data reset successfully");
 
     res.status(200).json({
       success: true,
       message: "Users data has been reset successfully",
       data: {
-        usersCleared: true,
-        resetAt: new Date().toISOString(),
+        clearedTables: [
+          'users',
+          'friendships', 
+          'notifications',
+          'related posts',
+          'related groups'
+        ]
       },
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    console.error("Reset users error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Internal server error during users reset",
-      error:
-        process.env.NODE_ENV === "development"
-          ? error.message
-          : "Something went wrong",
-      timestamp: new Date().toISOString(),
-    });
+    console.error("Error resetting users data:", error);
+    next(error);
   }
 });
 
@@ -163,44 +158,40 @@ router.post("/users", resetLimiter, async (req, res) => {
  * POST /reset/posts
  * Development-only endpoint to clear only posts data
  */
-router.post("/posts", resetLimiter, async (req, res) => {
+router.post("/posts", resetLimiter, async (req, res, next) => {
   try {
-    // Only allow in development mode
-    if (process.env.NODE_ENV === "production") {
+    if (process.env.NODE_ENV !== "development") {
       return res.status(403).json({
         success: false,
-        message: "Access denied",
-        error: "Reset posts endpoint is not available in production",
+        message: "Reset endpoint is only available in development mode",
         timestamp: new Date().toISOString(),
       });
     }
 
     console.log("🔄 Resetting posts data...");
 
-    // Reset posts.json to empty array
-    await writeJson("posts.json", []);
-    console.log("✅ Posts data cleared");
+    // Clear post-related data in proper order
+    await db.runQuery('DELETE FROM post_likes');
+    await db.runQuery('DELETE FROM post_groups');
+    await db.runQuery('DELETE FROM posts');
+
+    console.log("✅ Posts data reset successfully");
 
     res.status(200).json({
       success: true,
       message: "Posts data has been reset successfully",
       data: {
-        postsCleared: true,
-        resetAt: new Date().toISOString(),
+        clearedTables: [
+          'posts',
+          'post_likes',
+          'post_groups'
+        ]
       },
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    console.error("Reset posts error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Internal server error during posts reset",
-      error:
-        process.env.NODE_ENV === "development"
-          ? error.message
-          : "Something went wrong",
-      timestamp: new Date().toISOString(),
-    });
+    console.error("Error resetting posts data:", error);
+    next(error);
   }
 });
 

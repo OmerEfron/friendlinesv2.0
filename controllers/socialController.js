@@ -1,4 +1,4 @@
-const { readJson } = require('../utils/dbUtils');
+const { db } = require('../utils/database');
 const { isValidId, validatePaginationParams } = require('../utils/validation');
 
 const getMutualFriends = async (req, res, next) => {
@@ -24,10 +24,8 @@ const getMutualFriends = async (req, res, next) => {
       });
     }
 
-    const users = await readJson('users');
-    
-    const user1 = users.find(u => u.id === id);
-    const user2 = users.find(u => u.id === userId);
+    const user1 = await db.getUserById(id);
+    const user2 = await db.getUserById(userId);
 
     if (!user1 || !user2) {
       return res.status(404).json({
@@ -37,21 +35,30 @@ const getMutualFriends = async (req, res, next) => {
       });
     }
 
-    // Find mutual connections (users who are friends with both)
-    const user1Friends = user1.friends || [];
-    const user2Friends = user2.friends || [];
+    // Get friends for both users
+    const user1Friends = await db.getUserFriends(id);
+    const user2Friends = await db.getUserFriends(userId);
     
-    const mutualFriendIds = user1Friends.filter(id => user2Friends.includes(id));
+    const user1FriendIds = user1Friends.map(f => f.id);
+    const user2FriendIds = user2Friends.map(f => f.id);
+    
+    // Find mutual friends
+    const mutualFriendIds = user1FriendIds.filter(friendId => user2FriendIds.includes(friendId));
     
     // Get user details for mutual friends
-    const mutualFriends = users
-      .filter(u => mutualFriendIds.includes(u.id))
-      .map(u => ({
-        id: u.id,
-        fullName: u.fullName,
-        avatar: u.avatar,
-        friendsCount: u.friendsCount || 0
-      }));
+    const mutualFriends = [];
+    for (const friendId of mutualFriendIds) {
+      const friend = await db.getUserById(friendId);
+      if (friend) {
+        const friendsCount = await db.getUserFriends(friendId);
+        mutualFriends.push({
+          id: friend.id,
+          fullName: friend.fullName,
+          avatar: friend.avatar,
+          friendsCount: friendsCount.length
+        });
+      }
+    }
 
     // Implement pagination
     const startIndex = (pagination.page - 1) * pagination.limit;
@@ -94,8 +101,7 @@ const getFriendSuggestions = async (req, res, next) => {
       });
     }
 
-    const users = await readJson('users');
-    const currentUser = users.find(u => u.id === id);
+    const currentUser = await db.getUserById(id);
 
     if (!currentUser) {
       return res.status(404).json({
@@ -105,37 +111,43 @@ const getFriendSuggestions = async (req, res, next) => {
       });
     }
 
-    const friends = currentUser.friends || [];
+    const friends = await db.getUserFriends(id);
+    const friendIds = friends.map(f => f.id);
 
     // Simple suggestion algorithm: friends of friends who user isn't friends with
     const suggestions = new Set();
     
     // Get people who are friends with your friends
-    friends.forEach(friendId => {
-      const friend = users.find(u => u.id === friendId);
-      if (friend?.friends) {
-        friend.friends.forEach(suggestedId => {
-          if (suggestedId !== id && !friends.includes(suggestedId)) {
-            suggestions.add(suggestedId);
-          }
-        });
+    for (const friend of friends) {
+      const friendsOfFriend = await db.getUserFriends(friend.id);
+      for (const suggestedFriend of friendsOfFriend) {
+        if (suggestedFriend.id !== id && !friendIds.includes(suggestedFriend.id)) {
+          suggestions.add(suggestedFriend.id);
+        }
       }
-    });
+    }
 
     // Get user details for suggestions
-    const suggestionUsers = Array.from(suggestions)
-      .slice(0, parseInt(limit))
-      .map(suggestedId => {
-        const user = users.find(u => u.id === suggestedId);
-        return user ? {
+    const suggestionUsers = [];
+    let count = 0;
+    for (const suggestedId of suggestions) {
+      if (count >= parseInt(limit)) break;
+      
+      const user = await db.getUserById(suggestedId);
+      if (user) {
+        const userFriends = await db.getUserFriends(suggestedId);
+        const mutualFriends = userFriends.filter(f => friendIds.includes(f.id)).length;
+        
+        suggestionUsers.push({
           id: user.id,
           fullName: user.fullName,
           avatar: user.avatar,
-          friendsCount: user.friendsCount || 0,
-          mutualFriends: (user.friends || []).filter(f => friends.includes(f)).length
-        } : null;
-      })
-      .filter(Boolean);
+          friendsCount: userFriends.length,
+          mutualFriends
+        });
+        count++;
+      }
+    }
 
     res.status(200).json({
       success: true,
@@ -162,8 +174,7 @@ const bulkFriendshipStatus = async (req, res, next) => {
       });
     }
 
-    const users = await readJson('users');
-    const currentUser = users.find(u => u.id === userId);
+    const currentUser = await db.getUserById(userId);
 
     if (!currentUser) {
       return res.status(404).json({
@@ -173,46 +184,41 @@ const bulkFriendshipStatus = async (req, res, next) => {
       });
     }
 
-    const friends = currentUser.friends || [];
-    const sentRequests = currentUser.sentFriendRequests || [];
-    const receivedRequests = currentUser.friendRequests || [];
-
-    const statusResults = targetUserIds.map(targetId => {
+    const statusResults = [];
+    
+    for (const targetId of targetUserIds) {
       if (!isValidId(targetId)) {
-        return { userId: targetId, error: 'Invalid user ID format' };
+        statusResults.push({ userId: targetId, error: 'Invalid user ID format' });
+        continue;
       }
 
-      const targetUser = users.find(u => u.id === targetId);
+      const targetUser = await db.getUserById(targetId);
       if (!targetUser) {
-        return { userId: targetId, error: 'User not found' };
+        statusResults.push({ userId: targetId, error: 'User not found' });
+        continue;
       }
 
-      const areFriends = friends.includes(targetId);
-      const requestSent = sentRequests.includes(targetId);
-      const requestReceived = receivedRequests.includes(targetId);
-
+      const friendshipStatus = await db.getFriendshipStatus(userId, targetId);
+      
       let status = 'none';
-      if (areFriends) {
-        status = 'friends';
-      } else if (requestSent) {
-        status = 'request_sent';
-      } else if (requestReceived) {
-        status = 'request_received';
+      if (friendshipStatus) {
+        if (friendshipStatus.status === 'accepted') {
+          status = 'friends';
+        } else if (friendshipStatus.status === 'pending') {
+          status = friendshipStatus.requesterId === userId ? 'request_sent' : 'request_received';
+        }
       }
 
-      return {
+      statusResults.push({
         userId: targetId,
-        fullName: targetUser.fullName,
-        status: status,
-        areFriends: areFriends,
-        requestSent: requestSent,
-        requestReceived: requestReceived
-      };
-    });
+        status,
+        mutualFriends: 0 // Could be calculated if needed
+      });
+    }
 
     res.status(200).json({
       success: true,
-      message: 'Bulk friendship status retrieved successfully',
+      message: 'Friendship statuses retrieved successfully',
       data: statusResults,
       timestamp: new Date().toISOString()
     });

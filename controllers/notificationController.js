@@ -1,6 +1,9 @@
-const { readJson, writeJson, generateId } = require('../utils/dbUtils');
-const { isValidId, validatePaginationParams } = require('../utils/validation');
+const { db } = require('../utils/database');
+const { isValidId } = require('../utils/validation');
 
+/**
+ * Get user notifications with pagination
+ */
 const getUserNotifications = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -14,46 +17,26 @@ const getUserNotifications = async (req, res, next) => {
       });
     }
 
-    const { page: validatedPage, limit: validatedLimit } = validatePaginationParams(req.query);
-
-    // Initialize notifications file if it doesn't exist
-    let notifications;
-    try {
-      notifications = await readJson('notifications');
-    } catch (error) {
-      notifications = [];
-      await writeJson('notifications', notifications);
-    }
-
-    // Filter notifications for this user
-    let userNotifications = notifications.filter(notif => notif.userId === id);
+    // Get notifications using modern database
+    const notifications = await db.getUserNotifications(
+      id, 
+      parseInt(limit), 
+      (parseInt(page) - 1) * parseInt(limit)
+    );
 
     // Filter for unread only if requested
-    if (unreadOnly === 'true') {
-      userNotifications = userNotifications.filter(notif => !notif.read);
-    }
-
-    // Sort by creation date (newest first)
-    userNotifications.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-
-    // Implement pagination
-    const startIndex = (validatedPage - 1) * validatedLimit;
-    const endIndex = startIndex + validatedLimit;
-    const paginatedNotifications = userNotifications.slice(startIndex, endIndex);
-
-    const totalPages = Math.ceil(userNotifications.length / validatedLimit);
+    const filteredNotifications = unreadOnly === 'true' 
+      ? notifications.filter(n => !n.isRead)
+      : notifications;
 
     res.status(200).json({
       success: true,
       message: 'Notifications retrieved successfully',
-      data: paginatedNotifications,
+      data: filteredNotifications,
       pagination: {
-        page: validatedPage,
-        limit: validatedLimit,
-        totalNotifications: userNotifications.length,
-        totalPages,
-        hasNextPage: validatedPage < totalPages,
-        hasPrevPage: validatedPage > 1
+        page: parseInt(page),
+        limit: parseInt(limit),
+        hasMore: filteredNotifications.length === parseInt(limit)
       },
       timestamp: new Date().toISOString()
     });
@@ -64,50 +47,51 @@ const getUserNotifications = async (req, res, next) => {
   }
 };
 
+/**
+ * Mark notifications as read
+ */
 const markNotificationsAsRead = async (req, res, next) => {
   try {
     const { notificationIds, userId } = req.body;
 
-    if (!Array.isArray(notificationIds) || notificationIds.length === 0) {
+    if (!Array.isArray(notificationIds) || !isValidId(userId)) {
       return res.status(400).json({
         success: false,
-        message: 'NotificationIds must be a non-empty array',
+        message: 'Invalid notification IDs or user ID format',
         timestamp: new Date().toISOString()
       });
     }
 
-    if (!isValidId(userId)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid user ID format',
-        timestamp: new Date().toISOString()
-      });
-    }
-
-    let notifications;
-    try {
-      notifications = await readJson('notifications');
-    } catch (error) {
-      notifications = [];
-    }
-
-    let markedCount = 0;
-    notifications = notifications.map(notif => {
-      if (notificationIds.includes(notif.id) && notif.userId === userId) {
-        markedCount++;
-        return { ...notif, read: true };
+    // Mark each notification as read using modern database
+    const results = [];
+    for (const notificationId of notificationIds) {
+      if (isValidId(notificationId)) {
+        const result = await db.markNotificationAsRead(notificationId);
+        results.push({
+          notificationId,
+          success: result.success,
+          error: result.error
+        });
+      } else {
+        results.push({
+          notificationId,
+          success: false,
+          error: 'Invalid notification ID format'
+        });
       }
-      return notif;
-    });
+    }
 
-    await writeJson('notifications', notifications);
+    const successCount = results.filter(r => r.success).length;
+    const errorCount = results.length - successCount;
 
     res.status(200).json({
       success: true,
-      message: `${markedCount} notifications marked as read`,
+      message: `${successCount} notifications marked as read`,
       data: {
-        markedCount,
-        requestedCount: notificationIds.length
+        processed: results.length,
+        successful: successCount,
+        errors: errorCount,
+        results: results.filter(r => !r.success) // Only return failed ones
       },
       timestamp: new Date().toISOString()
     });
@@ -118,38 +102,84 @@ const markNotificationsAsRead = async (req, res, next) => {
   }
 };
 
-const createNotification = async (userId, type, title, message, data = {}) => {
+/**
+ * Create a new notification (internal use)
+ */
+const createNotification = async (notificationData) => {
   try {
-    let notifications;
-    try {
-      notifications = await readJson('notifications');
-    } catch (error) {
-      notifications = [];
-    }
-
     const notification = {
-      id: generateId('n'),
-      userId,
-      type,
-      title,
-      message,
-      data,
-      read: false,
+      id: db.generateId('n'),
+      userId: notificationData.userId,
+      type: notificationData.type,
+      title: notificationData.title,
+      message: notificationData.message,
+      data: notificationData.data || {},
+      isRead: false,
       createdAt: new Date().toISOString()
     };
 
-    notifications.push(notification);
-    await writeJson('notifications', notifications);
-
-    return notification;
+    const result = await db.createNotification(notification);
+    
+    if (result.success) {
+      console.log(`Notification created for user ${notificationData.userId}: ${notificationData.title}`);
+      return { success: true, data: notification };
+    } else {
+      console.error('Failed to create notification:', result.error);
+      return { success: false, error: result.error };
+    }
   } catch (error) {
     console.error('Error creating notification:', error);
-    throw error;
+    return { success: false, error: 'Failed to create notification' };
+  }
+};
+
+/**
+ * Get notification statistics for a user
+ */
+const getNotificationStats = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    if (!isValidId(id)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid user ID format',
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    // Get all notifications for the user
+    const allNotifications = await db.getUserNotifications(id, 1000, 0);
+    
+    const stats = {
+      total: allNotifications.length,
+      unread: allNotifications.filter(n => !n.isRead).length,
+      read: allNotifications.filter(n => n.isRead).length,
+      byType: {}
+    };
+
+    // Count by notification type
+    allNotifications.forEach(notification => {
+      const type = notification.type || 'unknown';
+      stats.byType[type] = (stats.byType[type] || 0) + 1;
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Notification statistics retrieved successfully',
+      data: stats,
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('Error getting notification stats:', error);
+    next(error);
   }
 };
 
 module.exports = {
   getUserNotifications,
   markNotificationsAsRead,
-  createNotification
+  createNotification,
+  getNotificationStats
 }; 

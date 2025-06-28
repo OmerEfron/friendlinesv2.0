@@ -2,7 +2,7 @@
 // Follows Expo's best practices for reliable delivery and error handling
 
 const { Expo } = require('expo-server-sdk');
-const { readJson, writeJson, generateId } = require('./dbUtils');
+const { db } = require('./database');
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 
@@ -52,12 +52,12 @@ const expo = new Expo({
 
 // Database connection for receipt tracking
 const dbPath = path.join(__dirname, '../data/friendlines.db');
-let db = null;
+let receiptDb = null;
 
 // Initialize database connection
 const initializeReceiptDb = () => {
-  if (!db) {
-    db = new sqlite3.Database(dbPath, (err) => {
+  if (!receiptDb) {
+    receiptDb = new sqlite3.Database(dbPath, (err) => {
       if (err) {
         console.error('Error opening receipt tracking database:', err);
       }
@@ -103,25 +103,18 @@ const registerDevice = async (userId, expoPushToken) => {
       };
     }
 
-    // Read existing users
-    const users = await readJson('users.json');
-    
-    // Find user by ID
-    const userIndex = users.findIndex(u => u.id === userId);
-    
-    if (userIndex === -1) {
+    // Update user with new push token using modern database
+    const updateResult = await db.updateUser(userId, {
+      expoPushToken: expoPushToken,
+      updatedAt: new Date().toISOString()
+    });
+
+    if (!updateResult.success) {
       return {
         success: false,
-        error: 'User not found'
+        error: updateResult.error || 'User not found'
       };
     }
-
-    // Update user with new push token
-    users[userIndex].expoPushToken = expoPushToken;
-    users[userIndex].updatedAt = new Date().toISOString();
-
-    // Save updated users
-    await writeJson('users.json', users);
 
     console.log(`Push token registered for user ${userId}`);
     
@@ -297,36 +290,33 @@ const sendPushImmediate = async (notificationTask) => {
 
 /**
  * Store notification tickets for later receipt checking
- * @param {Array} tickets - Array of push notification tickets
+ * @param {Array} tickets - Notification tickets from Expo
  * @param {string} notificationType - Type of notification for tracking
  */
 const storeTicketsForReceiptCheck = async (tickets, notificationType) => {
+  if (!tickets || tickets.length === 0) return;
+
   try {
-    initializeReceiptDb();
-
-    const validTickets = tickets.filter(ticket => 
-      ticket.status === 'ok' && ticket.id
-    );
-
-    if (validTickets.length === 0) return;
-
     const now = new Date().toISOString();
     const checkAfter = new Date(Date.now() + RECEIPT_CHECK_DELAY).toISOString();
 
-    // Insert receipts into database
-    const stmt = db.prepare(`
-      INSERT OR IGNORE INTO push_receipts 
-      (id, ticketId, notificationType, createdAt, checkAfter, retryCount)
-      VALUES (?, ?, ?, ?, ?, 0)
-    `);
-
-    for (const ticket of validTickets) {
-      const receiptId = generateId('pr');
-      stmt.run(receiptId, ticket.id, notificationType, now, checkAfter);
+    for (const ticket of tickets) {
+      if (ticket.id) {
+        await new Promise((resolve, reject) => {
+          receiptDb.run(
+            `INSERT INTO push_receipts (id, ticketId, notificationType, status, createdAt, checkAfter) 
+             VALUES (?, ?, ?, ?, ?, ?)`,
+            [db.generateId('r'), ticket.id, notificationType, 'pending', now, checkAfter],
+            (err) => {
+              if (err) reject(err);
+              else resolve();
+            }
+          );
+        });
+      }
     }
 
-    stmt.finalize();
-    console.log(`Stored ${validTickets.length} tickets for receipt checking`);
+    console.log(`Stored ${tickets.length} tickets for receipt checking`);
   } catch (error) {
     console.error('Error storing tickets for receipt check:', error);
   }
@@ -334,20 +324,22 @@ const storeTicketsForReceiptCheck = async (tickets, notificationType) => {
 
 /**
  * Check push notification receipts and handle errors
- * Should be called periodically (e.g., every 30 minutes)
  */
 const checkPushReceipts = async () => {
   try {
     initializeReceiptDb();
-
+    
     const now = new Date().toISOString();
     
-    // Get receipts ready to check from database
-    const readyToCheck = await new Promise((resolve, reject) => {
-      db.all(
+    // Get receipts that are due for checking
+    const receipts = await new Promise((resolve, reject) => {
+      receiptDb.all(
         `SELECT * FROM push_receipts 
-         WHERE checkAfter <= ? AND retryCount < ? AND status = 'pending'
-         ORDER BY createdAt ASC`,
+         WHERE status = 'pending' 
+         AND checkAfter <= ? 
+         AND retryCount < ?
+         ORDER BY createdAt ASC 
+         LIMIT 1000`,
         [now, MAX_RECEIPT_RETRIES],
         (err, rows) => {
           if (err) reject(err);
@@ -356,97 +348,80 @@ const checkPushReceipts = async () => {
       );
     });
 
-    if (readyToCheck.length === 0) {
-      // Clean up old receipts (older than 24 hours)
-      const cutoff = new Date(Date.now() - RECEIPT_CLEANUP_AFTER).toISOString();
-      await new Promise((resolve, reject) => {
-        db.run(
-          'DELETE FROM push_receipts WHERE createdAt < ?',
-          [cutoff],
-          function(err) {
-            if (err) reject(err);
-            else {
-              if (this.changes > 0) {
-                console.log(`Cleaned up ${this.changes} old receipts`);
-              }
-              resolve();
-            }
-          }
-        );
-      });
+    if (receipts.length === 0) {
+      console.log('No receipts to check');
       return;
     }
 
-    console.log(`Checking ${readyToCheck.length} push notification receipts`);
+    console.log(`Checking ${receipts.length} push receipts...`);
 
-    // Check receipts in batches of 1000 (Expo's limit)
-    const batchSize = 1000;
-    const invalidTokens = [];
+    // Group receipts by chunks of 1000 (Expo limit)
+    const receiptIds = receipts.map(r => r.ticketId);
+    const chunks = expo.chunkPushNotificationReceiptIds(receiptIds);
+    
     const processedIds = [];
+    const invalidTokens = [];
 
-    for (let i = 0; i < readyToCheck.length; i += batchSize) {
-      const batch = readyToCheck.slice(i, i + batchSize);
-      const receiptIds = batch.map(r => r.ticketId);
-
+    for (const chunk of chunks) {
       try {
-        const receipts = await expo.getPushNotificationReceiptsAsync(receiptIds);
+        const receiptResults = await expo.getPushNotificationReceiptsAsync(chunk);
         
-        for (const receiptId in receipts) {
-          const receipt = receipts[receiptId];
-          const dbReceipt = batch.find(r => r.ticketId === receiptId);
+        for (const receiptId of Object.keys(receiptResults)) {
+          const receipt = receiptResults[receiptId];
+          const dbReceipt = receipts.find(r => r.ticketId === receiptId);
           
-          if (dbReceipt) {
-            processedIds.push(dbReceipt.id);
-
-            if (receipt.status === 'error') {
-              console.error(`Push receipt error for ${receiptId}:`, receipt);
-              
-              // Update database with error
-              await new Promise((resolve, reject) => {
-                db.run(
-                  `UPDATE push_receipts 
-                   SET status = 'error', errorMessage = ?, errorDetails = ?
-                   WHERE id = ?`,
-                  [receipt.message || 'Unknown error', JSON.stringify(receipt.details || {}), dbReceipt.id],
-                  (err) => {
-                    if (err) reject(err);
-                    else resolve();
-                  }
-                );
-              });
-              
-              if (receipt.details && receipt.details.error === 'DeviceNotRegistered') {
-                console.log('Device not registered - token should be removed');
-                // We could implement token removal here if we track token-to-receipt mapping
-              }
-            } else if (receipt.status === 'ok') {
-              console.log(`Push notification ${receiptId} delivered successfully`);
-              
-              // Update database with success
-              await new Promise((resolve, reject) => {
-                db.run(
-                  `UPDATE push_receipts 
-                   SET status = 'delivered', deliveredAt = ?
-                   WHERE id = ?`,
-                  [new Date().toISOString(), dbReceipt.id],
-                  (err) => {
-                    if (err) reject(err);
-                    else resolve();
-                  }
-                );
-              });
+          if (!dbReceipt) continue;
+          
+          processedIds.push(receiptId);
+          
+          if (receipt.status === 'error') {
+            console.error(`Push notification error for ${receiptId}:`, receipt.message);
+            
+            // Handle invalid device tokens
+            if (receipt.details?.error === 'DeviceNotRegistered') {
+              invalidTokens.push(receiptId);
             }
+            
+            // Update database with error
+            await new Promise((resolve, reject) => {
+              receiptDb.run(
+                `UPDATE push_receipts 
+                 SET status = 'error', errorMessage = ?, errorDetails = ?
+                 WHERE id = ?`,
+                [receipt.message, JSON.stringify(receipt.details), dbReceipt.id],
+                (err) => {
+                  if (err) reject(err);
+                  else resolve();
+                }
+              );
+            });
+          } else if (receipt.status === 'ok') {
+            console.log(`Push notification ${receiptId} delivered successfully`);
+            
+            // Update database with success
+            await new Promise((resolve, reject) => {
+              receiptDb.run(
+                `UPDATE push_receipts 
+                 SET status = 'delivered', deliveredAt = ?
+                 WHERE id = ?`,
+                [new Date().toISOString(), dbReceipt.id],
+                (err) => {
+                  if (err) reject(err);
+                  else resolve();
+                }
+              );
+            });
           }
         }
       } catch (error) {
         console.error('Error checking push receipts batch:', error);
         
         // Mark batch for retry with exponential backoff
-        const retryAfter = new Date(Date.now() + Math.pow(2, batch[0].retryCount) * 60000).toISOString();
+        const retryAfter = new Date(Date.now() + Math.pow(2, receipts[0].retryCount) * 60000).toISOString();
         
-        for (const receipt of batch) {
+        for (const receipt of receipts) {
           await new Promise((resolve, reject) => {
-            db.run(
+            receiptDb.run(
               `UPDATE push_receipts 
                SET retryCount = retryCount + 1, checkAfter = ?
                WHERE id = ?`,
@@ -481,29 +456,27 @@ const checkPushReceipts = async () => {
  */
 const getGroupMembersTokens = async (groupIds, excludeUserId = null) => {
   try {
-    const groups = await readJson('groups');
-    const users = await readJson('users');
-    
     const groupIdArray = Array.isArray(groupIds) ? groupIds : [groupIds];
     const allMemberIds = new Set();
     
     // Collect all unique member IDs from specified groups
     for (const groupId of groupIdArray) {
-      const group = groups.find(g => g.id === groupId);
-      if (group && group.members) {
-        group.members.forEach(memberId => {
-          if (memberId !== excludeUserId) {
-            allMemberIds.add(memberId);
-          }
-        });
-      }
+      const members = await db.getGroupMembers(groupId);
+      members.forEach(member => {
+        if (member.userId !== excludeUserId) {
+          allMemberIds.add(member.userId);
+        }
+      });
     }
     
     // Get tokens for all unique members
-    const memberTokens = users
-      .filter(u => allMemberIds.has(u.id) && u.expoPushToken)
-      .map(u => u.expoPushToken)
-      .filter(token => isValidExpoPushToken(token));
+    const memberTokens = [];
+    for (const memberId of allMemberIds) {
+      const user = await db.getUserById(memberId);
+      if (user && user.expoPushToken && isValidExpoPushToken(user.expoPushToken)) {
+        memberTokens.push(user.expoPushToken);
+      }
+    }
     
     return memberTokens;
   } catch (error) {
@@ -519,19 +492,14 @@ const getGroupMembersTokens = async (groupIds, excludeUserId = null) => {
  */
 const getFriendsTokens = async (userId) => {
   try {
-    const users = await readJson('users.json');
+    const friends = await db.getUserFriends(userId);
     
-    // Find the user
-    const user = users.find(u => u.id === userId);
-    if (!user || !user.friends) {
-      return [];
+    const friendTokens = [];
+    for (const friend of friends) {
+      if (friend.expoPushToken && isValidExpoPushToken(friend.expoPushToken)) {
+        friendTokens.push(friend.expoPushToken);
+      }
     }
-
-    // Get tokens for all friends
-    const friendTokens = users
-      .filter(u => user.friends.includes(u.id) && u.expoPushToken)
-      .map(u => u.expoPushToken)
-      .filter(token => isValidExpoPushToken(token));
 
     return friendTokens;
   } catch (error) {
@@ -547,10 +515,8 @@ const getFriendsTokens = async (userId) => {
  */
 const getFriendTokens = async (friendId) => {
   try {
-    const users = await readJson('users.json');
+    const friend = await db.getUserById(friendId);
     
-    // Find the friend
-    const friend = users.find(u => u.id === friendId);
     if (!friend || !friend.expoPushToken) {
       return [];
     }
@@ -573,22 +539,24 @@ const getFriendTokens = async (friendId) => {
  */
 const removeInvalidTokens = async (invalidTokens) => {
   try {
-    const users = await readJson('users.json');
+    // Get all users with push tokens
+    const users = await db.getAllUsers(1000); // Get more users for cleanup
     let updated = false;
 
     // Remove invalid tokens from users
-    users.forEach(user => {
+    for (const user of users) {
       if (user.expoPushToken && invalidTokens.includes(user.expoPushToken)) {
-        delete user.expoPushToken;
-        user.updatedAt = new Date().toISOString();
+        await db.updateUser(user.id, {
+          expoPushToken: null,
+          updatedAt: new Date().toISOString()
+        });
         updated = true;
         console.log(`Removed invalid token for user ${user.id}`);
       }
-    });
+    }
 
-    // Save if any changes were made
     if (updated) {
-      await writeJson('users.json', users);
+      console.log(`Cleaned up ${invalidTokens.length} invalid push tokens`);
     }
   } catch (error) {
     console.error('Error removing invalid tokens:', error);

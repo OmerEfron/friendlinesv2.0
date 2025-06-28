@@ -1039,7 +1039,7 @@ const registerPushToken = async (req, res) => {
     }
 
     // Update user with push token using modern database system
-    await db.updateUserPushToken(id, expoPushToken);
+    await db.updateUser(id, { expoPushToken });
 
     // Register device with notification service
     try {
